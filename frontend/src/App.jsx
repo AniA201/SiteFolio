@@ -27,6 +27,7 @@ const go = (page, id) => { location.hash = "#/" + page + (id ? "/" + id : ""); }
 export default function App() {
   const [route, setRoute] = useState(readHash);
   const [persona, setPersona] = useState("owner");
+  const [confirmReset, setConfirmReset] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [state, apply] = useBackend();
 
@@ -45,6 +46,7 @@ export default function App() {
     run: id => { if (!running) api.run(id).then(apply); },
     runAll: () => api.runAll(persona).then(apply),
     reset: id => api.reset(id).then(apply),
+    resetAll: () => api.resetAll().then(apply),
     retry: id => api.retry(id).then(apply),
     decide: (id, action) => api.decide(id, action).then(apply),
     ingest: sampleId => api.ingest(sampleId).then(r => { apply(r.state); go("claim", r.id); }),
@@ -100,6 +102,11 @@ export default function App() {
               {Object.entries(PERSONAS).map(([k, v]) => <option key={k} value={k}>{v.short}</option>)}
             </select></label>
             {TOOLS.map(([key, label]) => <a key={key} href={`#/${key}`} onClick={() => setMenuOpen(false)} aria-current={active === key ? "page" : undefined}>{label}</a>)}
+            {confirmReset
+              ? <div className="nav-reset"><span>Clear every check and decision?</span>
+                  <button type="button" className="btn black sm" onClick={() => { A.resetAll(); setConfirmReset(false); setMenuOpen(false); go("overview"); }}>Reset</button>
+                  <button type="button" className="btn white sm" onClick={() => setConfirmReset(false)}>Cancel</button></div>
+              : <button type="button" className="nav-reset-open" onClick={() => setConfirmReset(true)}>Reset demo</button>}
           </div>
         </div>
       </nav></div>
