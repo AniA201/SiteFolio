@@ -12,6 +12,7 @@ export default function EvidenceWalkthrough({ headline, lede, property, featured
   const pin = useRef(null);
   const [stage, setStage] = useState(0);
   const [sceneReady, setSceneReady] = useState(false);
+  const sceneProgress = useRef({ value: 0, instant: false, draw: null });
   const lastStage = useRef(0);
   const direction = useRef(1);
 
@@ -32,6 +33,9 @@ export default function EvidenceWalkthrough({ headline, lede, property, featured
         lastStage.current = active;
         setStage(active);
       }
+      const channel = sceneProgress.current;
+      channel.value = motion.matches ? active : progress * (STAGES.length - 1);
+      channel.draw?.();
       story.style.setProperty("--progress", progress);
       const compare = motion.matches ? Number(active >= 2) : clamp(progress * 3 - 1, 0, 1);
       story.style.setProperty("--comparison", compare);
@@ -39,12 +43,17 @@ export default function EvidenceWalkthrough({ headline, lede, property, featured
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(measure);
     };
+    const resumeMotion = () => { sceneProgress.current.instant = false; };
+    window.addEventListener("wheel", resumeMotion, { passive: true });
+    window.addEventListener("touchstart", resumeMotion, { passive: true });
     window.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     motion.addEventListener("change", schedule);
     schedule();
     return () => {
       cancelAnimationFrame(frame);
+      window.removeEventListener("wheel", resumeMotion);
+      window.removeEventListener("touchstart", resumeMotion);
       window.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
       motion.removeEventListener("change", schedule);
@@ -58,6 +67,7 @@ export default function EvidenceWalkthrough({ headline, lede, property, featured
     const inset = parseFloat(getComputedStyle(sticky).top) || 0;
     const distance = story.offsetHeight - sticky.offsetHeight;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    sceneProgress.current.instant = keyboard;
     window.scrollTo({
       top: window.scrollY + story.getBoundingClientRect().top - inset + distance * chapter / (STAGES.length - 1),
       behavior: reduced || keyboard ? "instant" : "smooth",
@@ -74,7 +84,7 @@ export default function EvidenceWalkthrough({ headline, lede, property, featured
   const line = featured?.lines?.[0];
   return (
     <section ref={root} className="evidence-story" aria-label="Interactive evidence walkthrough">
-      <div ref={pin} className="evidence-pin" data-stage={stage} style={{ "--entry-x": `${direction.current * -26}px` }}>
+      <div ref={pin} className="evidence-pin" data-stage={stage} style={{ "--entry-x": `${sceneProgress.current.instant ? 0 : direction.current * -32}px` }}>
         <div className="story-copy">
           <div className="story-words" key={stage}>
             <p className="over">{stage === 0 ? "Building evidence for payment review" : view.source}</p>
@@ -106,12 +116,12 @@ export default function EvidenceWalkthrough({ headline, lede, property, featured
         <div className="story-visual">
           <div className="story-art" data-scene-ready={sceneReady}>
             <SurveyDrawing view={stage - 1} />
-            <Suspense fallback={null}><PropertyScene stage={stage} onReady={setSceneReady} /></Suspense>
+            <Suspense fallback={null}><PropertyScene progress={sceneProgress} onReady={setSceneReady} /></Suspense>
           </div>
           <div className="story-location"><strong>{property?.name ?? "Property survey"}</strong><span>{property?.city}</span><span>Illustrative property model</span></div>
           {line && <div className="story-comparison" aria-label="Featured case comparison">
             <div><small>Submitted</small><strong>{line[1]}</strong></div>
-            <div><small>Evidence</small><strong>{line[2]}</strong></div>
+            <div><small>Case finding</small><strong>{line[2]}</strong></div>
           </div>}
         </div>
         <div className="story-navigation">
@@ -133,7 +143,7 @@ export default function EvidenceWalkthrough({ headline, lede, property, featured
           }}>
             {STAGES.map(([source, title], index) => (
               <button type="button" key={title} aria-label={`${source}: ${title}`} aria-pressed={stage === index} onClick={event => jump(index, event.detail === 0)}>
-                <span className="story-index">{String(index + 1).padStart(2, "0")}</span><strong>{title}</strong>
+                <strong>{title}</strong>
               </button>
             ))}
           </div>
