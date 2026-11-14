@@ -8,7 +8,7 @@ import asyncio
 import copy
 from datetime import datetime
 
-from .fixtures import CLAIMS
+from .fixtures import BUILDINGS, CLAIMS
 from .intake import EXTRA_BUILDINGS
 from .rules import build_judge_claim
 from .settings import settings
@@ -20,8 +20,21 @@ WHO = {"coordinator": "Coordinator", "roof": "Roof inspector", "interior": "Inte
 
 
 class Engine:
-    def __init__(self) -> None:
+    def __init__(self, history=None) -> None:
+        self.history = history
         self.reset_all()
+        if history and history.enabled:
+            for row in history.load_claims():
+                claim = row["claim"]
+                if not self.find(claim["id"]):
+                    self.claims.append(claim)
+                    self.samples.pop(claim["id"], None)
+                self.status[claim["id"]] = "ready" if row["status"] == "running" else row["status"]
+                self.steps[claim["id"]] = row["steps"]
+                if row["review"]:
+                    self.review[claim["id"]] = row["review"]
+                if row["retry"]:
+                    self.retry[claim["id"]] = True
         self._subs: set[asyncio.Queue] = set()
         self._wake = asyncio.Event()
         self._task: asyncio.Task | None = None
@@ -62,6 +75,12 @@ class Engine:
 
     def _changed(self) -> None:
         self.rev += 1
+        if self.history:
+            for claim in self.claims:
+                cid = claim["id"]
+                if cid in self.status or cid in self.queue or claim.get("judge"):
+                    self.history.save_claim(claim, self.status.get(cid, "ready"),
+                                            self.steps.get(cid, 0), self.review.get(cid), self.retry.get(cid, False))
         snap = self.snapshot()
         for q in list(self._subs):
             # Drop stale frames for slow clients; only the newest snapshot matters.
@@ -239,6 +258,7 @@ class Engine:
         self.agent_memory = run.memory
         self.paused[cid] = run
         loop.create_task(self._trace_url(cid, claim, run.run_id))
+        self._check_surcharge(cid, claim)
         self.steps[cid] = len(claim["steps"])
         self.status[cid] = claim["outcome"]["status"]
         self.current = None
@@ -257,7 +277,10 @@ class Engine:
         while self.current == cid:
             cur = self.steps.get(cid, 0)
             if cur >= len(claim["steps"]):
+                self._check_surcharge(cid, claim)
                 self.status[cid] = claim["outcome"]["status"]
+                if self.history:
+                    self.history.record(cid, claim["persona"], "check_completed", {"status": self.status[cid]})
                 self.current = None
                 self._changed()
                 return
@@ -267,4 +290,22 @@ class Engine:
                                 "text": f"{cid} · {text}", "ok": res})
             del self.log[LOG_LIMIT:]
             self.steps[cid] = cur + 1
+            if self.history:
+                self.history.record(cid, claim["persona"], "check_step",
+                                    {"worker": who, "text": text, "result": res})
             self._changed()
+
+    def _check_surcharge(self, cid: str, claim: dict) -> None:
+        if not (self.history and self.history.enabled and claim["persona"] == "reviewer" and claim["kind"] == "rentdup"):
+            return
+        building = BUILDINGS.get(claim["b"]) or EXTRA_BUILDINGS.get(claim["b"])
+        property_id = building.get("cs") if building else None
+        matches = self.history.active_surcharges(property_id, "roof") if property_id else []
+        claim["history_check"] = {"property_id": property_id, "work": "roof", "active_count": len(matches), "source": "Tiger Cloud"}
+        if matches:
+            claim["outcome"]["status"] = "denied"
+            claim["outcome"]["reason"] = "An active roof surcharge exists for this property. Review its registry record before approving another charge."
+        else:
+            claim["outcome"]["status"] = "blocked"
+            claim["outcome"]["reason"] = "No active roof surcharge was found in Tiger Cloud. The duplicate-charge result is unverified; review the application manually."
+        self.history.record(cid, "reviewer", "surcharge_checked", claim["history_check"])

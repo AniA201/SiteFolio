@@ -6,6 +6,7 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
+from datetime import date
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request
@@ -22,14 +23,17 @@ from .routes_kit import router as kit_router
 from .routes_solana import after_decision as solana_after_decision
 from .routes_solana import router as solana_router
 from .settings import settings
+from .tiger import TigerHistory
 
 engine: Engine
+tiger = TigerHistory()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     global engine
-    engine = Engine()
+    tiger.initialize()
+    engine = Engine(history=tiger)
     _.state.engine = engine
     engine.start()
     yield
@@ -58,6 +62,16 @@ class JudgeBill(BaseModel):
     hidden: str = Field(default="", max_length=2000)
 
 
+class SurchargeEntry(BaseModel):
+    property_id: str = Field(min_length=1, max_length=100)
+    building: str = Field(min_length=1, max_length=200)
+    work: str = Field(min_length=1, max_length=100)
+    approved: date
+    ends: date
+    per_unit: float = Field(ge=0)
+    source_claim_id: str = Field(min_length=1, max_length=100)
+
+
 def _claim_or_404(cid: str) -> dict:
     claim = engine.find(cid)
     if not claim:
@@ -83,6 +97,30 @@ def meta():
 @app.get("/api/state")
 def state():
     return engine.snapshot()
+
+
+@app.get("/api/history/{persona}")
+def history(persona: Literal["owner", "reviewer", "lender"]):
+    return tiger.dashboard(persona)
+
+
+@app.post("/api/history/surcharges")
+def register_surcharge(body: SurchargeEntry):
+    if not tiger.enabled:
+        raise HTTPException(503, "Tiger Cloud is not configured")
+    if body.ends < body.approved:
+        raise HTTPException(422, "End date must follow approval date")
+    claim = _claim_or_404(body.source_claim_id)
+    if claim["persona"] != "reviewer" or engine.review.get(claim["id"]) != "ok":
+        raise HTTPException(409, "An approved reviewer decision is required")
+    building = BUILDINGS.get(claim.get("b"))
+    if not building or building.get("cs") != body.property_id:
+        raise HTTPException(409, "Property does not match the approved claim")
+    tiger.register_surcharge(body.property_id, body.building, body.work,
+                             body.approved, body.ends, body.per_unit, body.source_claim_id)
+    tiger.record(claim["id"], "reviewer", "surcharge_registered",
+                 {"property_id": body.property_id, "work": body.work})
+    return tiger.dashboard("reviewer")
 
 
 @app.get("/api/stream")
@@ -118,13 +156,15 @@ def ingest(body: Ingest):
     cid = engine.ingest(body.sample_id)
     if not cid:
         raise HTTPException(404, "Sample already used or unknown")
+    tiger.record(cid, _claim_or_404(cid)["persona"], "document_ingested")
     return {"id": cid, "state": engine.snapshot()}
 
 
 @app.post("/api/claims/{cid}/run")
 def run(cid: str):
-    _claim_or_404(cid)
+    claim = _claim_or_404(cid)
     engine.run(cid)
+    tiger.record(cid, claim["persona"], "check_started")
     return engine.snapshot()
 
 
@@ -149,8 +189,9 @@ def retry(cid: str):
 
 @app.post("/api/claims/{cid}/decision")
 def decision(cid: str, body: Decision):
-    _claim_or_404(cid)
+    claim = _claim_or_404(cid)
     engine.decide(cid, body.action)
+    tiger.record(cid, claim["persona"], "decision", {"action": body.action})
     solana_after_decision(engine, cid, body.action)  # public receipt on Solana devnet, in the background
     return engine.snapshot()
 
@@ -158,12 +199,14 @@ def decision(cid: str, body: Decision):
 @app.post("/api/judge")
 def judge(body: JudgeBill):
     cid = engine.judge(body.area, body.amount, body.bank, body.hidden)
+    tiger.record(cid, "owner", "document_ingested")
     return {"id": cid, "state": engine.snapshot()}
 
 
 @app.post("/api/reset")
 def reset_everything():
     """Restore the demo to its starting state."""
+    tiger.clear_claims()
     engine.reset_all()
     engine._changed()
     return engine.snapshot()

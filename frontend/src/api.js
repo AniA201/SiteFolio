@@ -9,6 +9,7 @@ async function post(path, body) {
 }
 
 export const api = {
+  history: persona => fetch(`/api/history/${persona}`).then(r => { if (!r.ok) throw new Error("History unavailable"); return r.json(); }),
   state: () => fetch("/api/state").then(r => r.json()),
   stream: onState => {
     const es = new EventSource("/api/stream");
