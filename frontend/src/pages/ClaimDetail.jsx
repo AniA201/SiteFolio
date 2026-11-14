@@ -3,6 +3,7 @@ import { BUILDINGS, PARTIES, PERSONAS, partyOf } from "../data";
 import { COL, Check, Flag, J, LAYER, SvcChip, Tag, WHO, aerialKind, fmt, isLayer, money, sqft } from "../lib";
 import { Aerial, FloorPlan } from "../components/Illustrations";
 import MatterportTour, { toursFromCall } from "../components/MatterportTour";
+import Dossier from "../components/Dossier";
 
 const TABS = [["run", "Agent run"], ["apis", "Building data calls"], ["cross", "Cross-checks"], ["evidence", "Evidence"]];
 const MEASURED_KINDS = ["roof", "rent", "rentdup", "parking"];
@@ -11,7 +12,7 @@ const fileName = svc => svc.toLowerCase().replace(" ", "_") + ".json";
 const snake = s => s.toLowerCase().replace(/ /g, "_");
 
 // The real Vexcel orthophoto around the building, served by the backend (key stays server-side).
-function RealAerial({ B, show }) {
+export function RealAerial({ B, show }) {
   const [failed, setFailed] = useState(false);
   const half = Math.max(35, Math.round(Math.sqrt(B.roof * 0.0929) * 0.8));
   const src = `/api/data/vexcel/ortho.jpg?lat=${B.lat}&lon=${B.lon}&half_side_m=${half}&pixels=900`;
@@ -113,6 +114,7 @@ function RunTab({ S, A, c, step, done, mine, reached, setTab }) {
                 <div key={l}><div className="muted small">{l}</div><div style={{ fontWeight: 600 }}>{x}</div></div>
               ))}
             </div>
+            {reached(ci) && <Dossier d={B.dossier} />}
           </div>
         )}
         {vi >= 0 && (
