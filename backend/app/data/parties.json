@@ -1,0 +1,44 @@
+{
+  "lsr": {
+    "name": "Lone Star Roofing",
+    "role": "Contractor",
+    "acct": "••4421",
+    "memory": "Usually $5.50–6.20 per sq ft. Account ••4421 verified by phone in 2024."
+  },
+  "pam": {
+    "name": "Polar Air Mechanical",
+    "role": "Contractor",
+    "acct": "••7730",
+    "memory": "Fair pricing, but unit counts were high once before (INV-1702)."
+  },
+  "gcp": {
+    "name": "Gulf Coast Painting",
+    "role": "Contractor",
+    "acct": "••5562",
+    "memory": "Always matched the scan within 3%."
+  },
+  "gpv": {
+    "name": "Gulf Coast Paving",
+    "role": "Contractor",
+    "acct": "••7710",
+    "memory": "Charges by painted area. History is clean."
+  },
+  "wcl": {
+    "name": "Wilshire Court LLC",
+    "role": "Landlord",
+    "acct": "—",
+    "memory": "First application in our records."
+  },
+  "vgl": {
+    "name": "Vermont Gardens Owner LLC",
+    "role": "Landlord",
+    "acct": "—",
+    "memory": "Roof surcharge approved in 2023, still active."
+  },
+  "bbc": {
+    "name": "Bayou Build Co.",
+    "role": "Builder",
+    "acct": "••3390",
+    "memory": "3 earlier draws released on time."
+  }
+}

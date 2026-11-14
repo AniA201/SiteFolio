@@ -1,0 +1,26 @@
+[
+  {
+    "property_id": "CS-77341",
+    "building": "Vermont Gardens",
+    "work": "Roof",
+    "approved": "2023-07",
+    "ends": "2029-06",
+    "per_unit": "$19.80"
+  },
+  {
+    "property_id": "CS-77120",
+    "building": "Wilshire Court Apartments",
+    "work": "Seismic retrofit",
+    "approved": "2021-03",
+    "ends": "2027-02",
+    "per_unit": "$38.00"
+  },
+  {
+    "property_id": "CS-77502",
+    "building": "Normandie Arms",
+    "work": "Boiler",
+    "approved": "2020-01",
+    "ends": "2026-01",
+    "per_unit": "ended"
+  }
+]

@@ -1,0 +1,20 @@
+{
+  "owner": {
+    "label": "Property manager",
+    "org": "Bayou Property Partners",
+    "short": "Owner",
+    "verb": "bill"
+  },
+  "reviewer": {
+    "label": "City housing reviewer",
+    "org": "Rent stabilization review (demo)",
+    "short": "Reviewer",
+    "verb": "application"
+  },
+  "lender": {
+    "label": "Loan officer",
+    "org": "Construction lending (demo)",
+    "short": "Lender",
+    "verb": "loan request"
+  }
+}

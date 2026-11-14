@@ -1,0 +1,1106 @@
+[
+  {
+    "id": "CLM-2207",
+    "persona": "owner",
+    "party": "lsr",
+    "b": "wc",
+    "date": "Nov 11",
+    "title": "Roof replacement",
+    "amount": 87000,
+    "kind": "roof",
+    "claim": 14500,
+    "measured": 9820,
+    "apis": [
+      {
+        "svc": "AI model",
+        "who": "coordinator",
+        "title": "Read the document",
+        "req": "file: lone_star_roof.pdf\ntask: extract parties, building,\n      claimed work, amounts, pay_to",
+        "resp": "{\n  \"vendor\": \"Lone Star Roofing\",\n  \"items\": [\n    {\n      \"work\": \"Roof replacement\",\n      \"qty\": 14500,\n      \"unit\": \"sq ft\",\n      \"amount\": 87000\n    }\n  ],\n  \"pay_to\": \"••4421\"\n}"
+      },
+      {
+        "svc": "CoStar",
+        "who": "records",
+        "title": "Get the building record",
+        "req": "GET /properties/search\n  ?address=Westheimer Commons,\n   Houston, TX",
+        "resp": "{\n  \"property_id\": \"CS-48213\",\n  \"name\": \"Westheimer Commons\",\n  \"property_type\": \"Office\",\n  \"building_sf\": 29460,\n  \"stories\": 3,\n  \"year_built\": 1998,\n  \"lat\": 29.737,\n  \"lon\": -95.42\n}"
+      },
+      {
+        "svc": "Vexcel",
+        "who": "roof",
+        "title": "Look from above",
+        "req": "GET /imagery/roof\n  ?lat=29.737&lon=-95.42\n  &include=footprint,pitch,objects",
+        "resp": "{\n  \"footprint_sqft\": 9820,\n  \"roof_type\": \"flat\",\n  \"pitch_deg\": 0,\n  \"rooftop_units\": 8,\n  \"capture_date\": \"2026-03-04\"\n}"
+      },
+      {
+        "svc": "Tiger Data",
+        "who": "records",
+        "title": "Check history",
+        "req": "SELECT approved_acct, paid_before\nFROM vendors, payments\nWHERE vendor='Lone Star'\n  AND building='CS-48213'",
+        "resp": "{\n  \"approved_acct\": \"••4421\",\n  \"account_matches\": true,\n  \"duplicate\": false\n}"
+      }
+    ],
+    "steps": [
+      [
+        "coordinator",
+        "Read the bill and write the plan",
+        "done",
+        0
+      ],
+      [
+        "records",
+        "Get the building record",
+        "done",
+        1
+      ],
+      [
+        "roof",
+        "Measure the roof from above",
+        "done",
+        2
+      ],
+      [
+        "records",
+        "Cross-check: 29,460 sq ft ÷ 3 floors = 9,820",
+        "done"
+      ],
+      [
+        "roof",
+        "Compare with bill: 14,500 sq ft claimed",
+        "fail"
+      ],
+      [
+        "records",
+        "Check bank account and past payments",
+        "done",
+        3
+      ],
+      [
+        "coordinator",
+        "Plan updated: draft note to contractor, pause for manager",
+        "warn"
+      ],
+      [
+        "rules",
+        "Math: pay $58,920 for the verified area, hold $28,080",
+        "warn"
+      ]
+    ],
+    "cross": [
+      [
+        "Roof size",
+        "CoStar: 29,460 sq ft ÷ 3 floors = 9,820 sq ft",
+        "Vexcel: 9,820 sq ft, flat roof",
+        "Bill: 14,500 sq ft",
+        "Both sources agree. The bill is 48% too big."
+      ]
+    ],
+    "lines": [
+      [
+        "Roof area",
+        "14,500 sq ft",
+        "9,820 sq ft",
+        "bad"
+      ],
+      [
+        "Amount",
+        "$87,000",
+        "$58,920",
+        "bad"
+      ],
+      [
+        "Pay to",
+        "••4421",
+        "••4421 approved",
+        "ok"
+      ]
+    ],
+    "outcome": {
+      "status": "partial",
+      "a": [
+        "Pay now",
+        58920,
+        "green"
+      ],
+      "b": [
+        "Hold",
+        28080,
+        "amber"
+      ],
+      "reason": "The building record and the aerial image both put the roof at 9,820 sq ft, not 14,500. The roof was replaced, so the verified area is paid and the difference is held.",
+      "note": "Hi Dana, our building record and aerial measurement both show about 9,820 sq ft of roof at Westheimer Commons, not 14,500. We've paid $58,920 for the verified area. Could you send a corrected invoice or photos of the full scope?"
+    }
+  },
+  {
+    "id": "CLM-2214",
+    "persona": "owner",
+    "party": "pam",
+    "b": "wc",
+    "date": "Nov 12",
+    "title": "Rooftop AC replacement",
+    "amount": 96000,
+    "kind": "hvac",
+    "claim": 12,
+    "measured": 8,
+    "apis": [
+      {
+        "svc": "AI model",
+        "who": "coordinator",
+        "title": "Read the document",
+        "req": "file: polar_air_hvac.pdf\ntask: extract parties, building,\n      claimed work, amounts, pay_to",
+        "resp": "{\n  \"vendor\": \"Polar Air Mechanical\",\n  \"items\": [\n    {\n      \"work\": \"Replace rooftop AC units\",\n      \"qty\": 12,\n      \"unit\": \"units\",\n      \"amount\": 96000\n    }\n  ],\n  \"pay_to\": \"••7730\"\n}"
+      },
+      {
+        "svc": "Vexcel",
+        "who": "roof",
+        "title": "Look from above",
+        "req": "GET /imagery/roof\n  ?lat=29.737&lon=-95.42\n  &include=objects",
+        "resp": "{\n  \"rooftop_units\": 8,\n  \"capture_date\": \"2026-03-04\"\n}"
+      },
+      {
+        "svc": "Vexcel",
+        "who": "roof",
+        "title": "Look from an angle",
+        "req": "GET /imagery/roof\n  ?lat=29.737&lon=-95.42\n  &include=objects&view=oblique",
+        "resp": "{\n  \"view\": \"oblique\",\n  \"rooftop_units\": 8,\n  \"capture_date\": \"2026-03-04\"\n}"
+      },
+      {
+        "svc": "Tiger Data",
+        "who": "records",
+        "title": "Check history",
+        "req": "SELECT approved_acct FROM vendors\nWHERE vendor='Polar Air'",
+        "resp": "{\n  \"approved_acct\": \"••7730\",\n  \"account_matches\": true,\n  \"duplicate\": false\n}"
+      }
+    ],
+    "steps": [
+      [
+        "coordinator",
+        "Read the bill and write the plan",
+        "done",
+        0
+      ],
+      [
+        "roof",
+        "Count rooftop units from straight above",
+        "done",
+        1
+      ],
+      [
+        "roof",
+        "Count again from the angled view",
+        "done",
+        2
+      ],
+      [
+        "roof",
+        "Compare with bill: 12 units claimed",
+        "fail"
+      ],
+      [
+        "records",
+        "Check bank account and past payments",
+        "done",
+        3
+      ],
+      [
+        "coordinator",
+        "Plan updated: pause for manager",
+        "warn"
+      ],
+      [
+        "rules",
+        "Math: pay $64,000 for 8 units, hold $32,000",
+        "warn"
+      ]
+    ],
+    "cross": [
+      [
+        "AC units",
+        "Vexcel top-down: 8 units",
+        "Vexcel angled view: 8 units",
+        "Bill: 12 units",
+        "Two separate views agree on 8."
+      ]
+    ],
+    "lines": [
+      [
+        "Units",
+        "12",
+        "8",
+        "bad"
+      ],
+      [
+        "Amount",
+        "$96,000",
+        "$64,000",
+        "bad"
+      ],
+      [
+        "Pay to",
+        "••7730",
+        "••7730 approved",
+        "ok"
+      ]
+    ],
+    "outcome": {
+      "status": "partial",
+      "a": [
+        "Pay now",
+        64000,
+        "green"
+      ],
+      "b": [
+        "Hold",
+        32000,
+        "amber"
+      ],
+      "reason": "The straight-down and angled aerial images both show 8 units, not 12. Paying for 8 and holding the rest.",
+      "note": "Hi Polar Air, two aerial views both show 8 rooftop units at Westheimer Commons. We've paid for 8. Can you share serial numbers for the other 4?"
+    }
+  },
+  {
+    "id": "CLM-2223",
+    "persona": "owner",
+    "party": "lsr",
+    "b": "wc",
+    "date": "Nov 13",
+    "title": "Roof leak repair",
+    "amount": 14800,
+    "kind": "fraud",
+    "bank": "••9914",
+    "apis": [
+      {
+        "svc": "AI model",
+        "who": "coordinator",
+        "title": "Read the document",
+        "req": "file: lone_star_urgent.pdf\ntask: extract parties, building,\n      claimed work, amounts, pay_to",
+        "resp": "{\n  \"vendor\": \"Lone Star Roofing\",\n  \"items\": [\n    {\n      \"work\": \"Roof leak repair\",\n      \"amount\": 14800\n    }\n  ],\n  \"pay_to\": \"••9914\",\n  \"note\": \"We changed banks, please pay urgently\"\n}"
+      },
+      {
+        "svc": "Tiger Data",
+        "who": "records",
+        "title": "Check history",
+        "req": "SELECT approved_acct FROM vendors\nWHERE vendor='Lone Star'",
+        "resp": "{\n  \"approved_acct\": \"••4421\",\n  \"account_matches\": false\n}"
+      }
+    ],
+    "steps": [
+      [
+        "coordinator",
+        "Read the bill and write the plan",
+        "done",
+        0
+      ],
+      [
+        "coordinator",
+        "Text says \"we changed banks, pay urgently\"",
+        "warn"
+      ],
+      [
+        "records",
+        "Check bank account: ••9914 vs approved ••4421",
+        "fail",
+        1
+      ],
+      [
+        "rules",
+        "Refuse payment, open a review case",
+        "fail"
+      ]
+    ],
+    "cross": [
+      [
+        "Bank account",
+        "Vendor file: ••4421",
+        "Phone-verified 2024: ••4421",
+        "Bill: ••9914",
+        "New account on a bill is never accepted."
+      ]
+    ],
+    "lines": [
+      [
+        "Pay to",
+        "••9914",
+        "••4421 only",
+        "bad"
+      ],
+      [
+        "Amount",
+        "$14,800",
+        "$0 until verified",
+        "bad"
+      ]
+    ],
+    "outcome": {
+      "status": "blocked",
+      "a": [
+        "Paid",
+        0,
+        "gray"
+      ],
+      "b": [
+        "Stopped",
+        14800,
+        "red"
+      ],
+      "reason": "This bill asks to pay a new account. Accounts only change after a phone call to the number already on file.",
+      "note": "Call Lone Star Roofing at the number in the vendor file, not the one on this bill."
+    }
+  },
+  {
+    "id": "CLM-2219",
+    "persona": "owner",
+    "party": "gcp",
+    "b": "wc",
+    "date": "Nov 10",
+    "title": "Repaint offices 301–305",
+    "amount": 37200,
+    "kind": "interior",
+    "claim": 4600,
+    "measured": 4620,
+    "apis": [
+      {
+        "svc": "AI model",
+        "who": "coordinator",
+        "title": "Read the document",
+        "req": "file: gulf_paint.pdf\ntask: extract parties, building,\n      claimed work, amounts, pay_to",
+        "resp": "{\n  \"vendor\": \"Gulf Coast Painting\",\n  \"items\": [\n    {\n      \"work\": \"Repaint offices 301-305\",\n      \"qty\": 4600,\n      \"unit\": \"sq ft\",\n      \"amount\": 37200\n    }\n  ],\n  \"pay_to\": \"••5562\"\n}"
+      },
+      {
+        "svc": "CoStar",
+        "who": "records",
+        "title": "Get the building record",
+        "req": "GET /properties/search\n  ?address=Westheimer Commons,\n   Houston, TX",
+        "resp": "{\n  \"property_id\": \"CS-48213\",\n  \"name\": \"Westheimer Commons\",\n  \"property_type\": \"Office\",\n  \"building_sf\": 29460,\n  \"stories\": 3,\n  \"year_built\": 1998,\n  \"lat\": 29.737,\n  \"lon\": -95.42\n}"
+      },
+      {
+        "svc": "Matterport",
+        "who": "interior",
+        "title": "Look inside",
+        "req": "POST /api/models/graph   (GraphQL, server-side)\nquery {\n  model(id: \"MP-4WC\") {   # space for Westheimer Commons\n    rooms(floor: 3) {\n      label\n      classifications { label }\n      dimensions { area }   # Property Intelligence\n    }\n  }\n}",
+        "resp": "{\n  \"rooms\": [\n    {\n      \"label\": \"Office 301\",\n      \"dimensions\": {\n        \"area\": 880\n      }\n    },\n    {\n      \"label\": \"Office 302\",\n      \"dimensions\": {\n        \"area\": 880\n      }\n    },\n    {\n      \"label\": \"Office 303\",\n      \"dimensions\": {\n        \"area\": 1020\n      }\n    },\n    {\n      \"label\": \"Office 304\",\n      \"dimensions\": {\n        \"area\": 1000\n      }\n    },\n    {\n      \"label\": \"Office 305\",\n      \"dimensions\": {\n        \"area\": 840\n      }\n    }\n  ],\n  \"total_sq_ft\": 4620\n}"
+      },
+      {
+        "svc": "Tiger Data",
+        "who": "records",
+        "title": "Check history",
+        "req": "SELECT approved_acct FROM vendors\nWHERE vendor='Gulf Coast Painting'",
+        "resp": "{\n  \"approved_acct\": \"••5562\",\n  \"account_matches\": true,\n  \"duplicate\": false\n}"
+      }
+    ],
+    "steps": [
+      [
+        "coordinator",
+        "Read the bill and write the plan",
+        "done",
+        0
+      ],
+      [
+        "records",
+        "Get the building record",
+        "done",
+        1
+      ],
+      [
+        "interior",
+        "Measure offices 301–305 in the 3D scan",
+        "done",
+        2
+      ],
+      [
+        "interior",
+        "Compare: 4,620 sq ft measured vs 4,600 claimed",
+        "done"
+      ],
+      [
+        "records",
+        "Check bank account and past payments",
+        "done",
+        3
+      ],
+      [
+        "rules",
+        "Pay $37,200 once",
+        "done"
+      ]
+    ],
+    "cross": [
+      [
+        "Office area",
+        "CoStar: floor 3 is 9,820 sq ft",
+        "Matterport: offices 301–305 = 4,620 sq ft",
+        "Bill: 4,600 sq ft",
+        "Matches within 1%."
+      ]
+    ],
+    "lines": [
+      [
+        "Area",
+        "4,600 sq ft",
+        "4,620 sq ft",
+        "ok"
+      ],
+      [
+        "Pay to",
+        "••5562",
+        "••5562 approved",
+        "ok"
+      ]
+    ],
+    "outcome": {
+      "status": "approved",
+      "a": [
+        "Paid",
+        37200,
+        "green"
+      ],
+      "b": [
+        "Held",
+        0,
+        "gray"
+      ],
+      "reason": "Everything matches. Paid once to the approved account."
+    }
+  },
+  {
+    "id": "RSO-3104",
+    "persona": "reviewer",
+    "party": "wcl",
+    "b": "wca",
+    "date": "Nov 9",
+    "title": "Roof and hallway flooring",
+    "amount": 90400,
+    "kind": "rent",
+    "claim": 10800,
+    "measured": 7200,
+    "apis": [
+      {
+        "svc": "AI model",
+        "who": "coordinator",
+        "title": "Read the document",
+        "req": "file: wilshire_court_application.pdf\ntask: extract parties, building,\n      claimed work, amounts, pay_to",
+        "resp": "{\n  \"units\": 24,\n  \"items\": [\n    {\n      \"work\": \"Roof\",\n      \"qty\": 10800,\n      \"amount\": 64800\n    },\n    {\n      \"work\": \"Hallway flooring\",\n      \"qty\": 3200,\n      \"amount\": 25600\n    }\n  ],\n  \"total_claimed\": 90400\n}"
+      },
+      {
+        "svc": "CoStar",
+        "who": "records",
+        "title": "Get the building record",
+        "req": "GET /properties/search\n  ?address=Wilshire Court Apartments,\n   Los Angeles, CA",
+        "resp": "{\n  \"property_id\": \"CS-77120\",\n  \"name\": \"Wilshire Court Apartments\",\n  \"property_type\": \"Multifamily\",\n  \"building_sf\": 21600,\n  \"stories\": 3,\n  \"units\": 24,\n  \"year_built\": 1964,\n  \"lat\": 34.062,\n  \"lon\": -118.3\n}"
+      },
+      {
+        "svc": "Vexcel",
+        "who": "roof",
+        "title": "Look from above",
+        "req": "GET /imagery/roof\n  ?lat=34.062&lon=-118.3\n  &include=footprint,pitch",
+        "resp": "{\n  \"footprint_sqft\": 7200,\n  \"roof_type\": \"flat\",\n  \"pitch_deg\": 0,\n  \"capture_date\": \"2026-05-18\"\n}"
+      },
+      {
+        "svc": "Matterport",
+        "who": "interior",
+        "title": "Look inside",
+        "req": "POST /api/models/graph   (GraphQL, server-side)\nquery {\n  model(id: \"MP-9QX\") {   # space for Wilshire Court Apartments\n    rooms {\n      label\n      classifications { label }\n      dimensions { area }   # Property Intelligence\n    }\n  }\n}",
+        "resp": "{\n  \"rooms\": [\n    {\n      \"label\": \"Hallway L1\",\n      \"classifications\": [\n        {\n          \"label\": \"Hallway\"\n        }\n      ],\n      \"dimensions\": {\n        \"area\": 640\n      }\n    },\n    {\n      \"label\": \"Hallway L2\",\n      \"classifications\": [\n        {\n          \"label\": \"Hallway\"\n        }\n      ],\n      \"dimensions\": {\n        \"area\": 640\n      }\n    },\n    {\n      \"label\": \"Hallway L3\",\n      \"classifications\": [\n        {\n          \"label\": \"Hallway\"\n        }\n      ],\n      \"dimensions\": {\n        \"area\": 640\n      }\n    }\n  ],\n  \"hallway_total_sq_ft\": 1920\n}"
+      },
+      {
+        "svc": "Tiger Data",
+        "who": "records",
+        "title": "Check history",
+        "req": "SELECT * FROM surcharges\nWHERE property='CS-77120'\n  AND work='roof' AND ends_at > now()",
+        "resp": "{\n  \"active_roof_surcharge\": false\n}"
+      }
+    ],
+    "steps": [
+      [
+        "coordinator",
+        "Read the application and write the plan",
+        "done",
+        0
+      ],
+      [
+        "records",
+        "Get the building record",
+        "done",
+        1
+      ],
+      [
+        "roof",
+        "Measure the roof from above",
+        "done",
+        2
+      ],
+      [
+        "interior",
+        "Measure the hallways in the 3D scan",
+        "done",
+        3
+      ],
+      [
+        "roof",
+        "Roof: 7,200 sq ft vs 10,800 claimed",
+        "fail"
+      ],
+      [
+        "interior",
+        "Flooring: 1,920 sq ft vs 3,200 claimed",
+        "fail"
+      ],
+      [
+        "coordinator",
+        "Plan updated: request contractor photos",
+        "warn"
+      ],
+      [
+        "records",
+        "Check for an active roof surcharge",
+        "done",
+        4
+      ],
+      [
+        "rules",
+        "Rent math: $20.33 per unit, not $31.39",
+        "warn"
+      ]
+    ],
+    "cross": [
+      [
+        "Roof size",
+        "CoStar: 21,600 sq ft ÷ 3 floors = 7,200",
+        "Vexcel: 7,200 sq ft, flat",
+        "Claim: 10,800 sq ft",
+        "Roof is 50% smaller than claimed."
+      ],
+      [
+        "Hallway floor",
+        "CoStar: 3 floors",
+        "Matterport: 3 hallways = 1,920 sq ft",
+        "Claim: 3,200 sq ft",
+        "Flooring is 40% smaller than claimed."
+      ]
+    ],
+    "lines": [
+      [
+        "Roof",
+        "10,800 sq ft · $64,800",
+        "7,200 sq ft · $43,200",
+        "bad"
+      ],
+      [
+        "Hallway flooring",
+        "3,200 sq ft · $25,600",
+        "1,920 sq ft · $15,360",
+        "bad"
+      ],
+      [
+        "Per unit, per month",
+        "$31.39",
+        "$20.33",
+        "bad"
+      ]
+    ],
+    "rent": {
+      "units": 24,
+      "claimed": 31.39,
+      "verified": 20.33,
+      "months": 60
+    },
+    "outcome": {
+      "status": "reduced",
+      "a": [
+        "Claimed",
+        "$31.39/mo",
+        "gray"
+      ],
+      "b": [
+        "Verified",
+        "$20.33/mo",
+        "amber"
+      ],
+      "reason": "The roof and hallways are both smaller than the application says. Under the 50% / 60-month formula, the fair surcharge is $20.33 per unit per month.",
+      "note": "The application overstates the roof by 3,600 sq ft and the hallway flooring by 1,280 sq ft. Please submit contractor photos or measurements to support the claimed areas."
+    }
+  },
+  {
+    "id": "RSO-3110",
+    "persona": "reviewer",
+    "party": "vgl",
+    "b": "vg",
+    "date": "Nov 13",
+    "title": "Roof coating",
+    "amount": 44400,
+    "kind": "rentdup",
+    "claim": 7400,
+    "measured": 7200,
+    "intake": true,
+    "apis": [
+      {
+        "svc": "AI model",
+        "who": "coordinator",
+        "title": "Read the document",
+        "req": "file: vermont_gardens_application.pdf\ntask: extract parties, building,\n      claimed work, amounts, pay_to",
+        "resp": "{\n  \"units\": 16,\n  \"items\": [\n    {\n      \"work\": \"Roof coating\",\n      \"qty\": 7400,\n      \"amount\": 44400\n    }\n  ]\n}"
+      },
+      {
+        "svc": "CoStar",
+        "who": "records",
+        "title": "Get the building record",
+        "req": "GET /properties/search\n  ?address=Vermont Gardens,\n   Los Angeles, CA",
+        "resp": "{\n  \"property_id\": \"CS-77341\",\n  \"name\": \"Vermont Gardens\",\n  \"property_type\": \"Multifamily\",\n  \"building_sf\": 14400,\n  \"stories\": 2,\n  \"units\": 16,\n  \"year_built\": 1971,\n  \"lat\": 34.081,\n  \"lon\": -118.29\n}"
+      },
+      {
+        "svc": "Vexcel",
+        "who": "roof",
+        "title": "Look from above",
+        "req": "GET /imagery/roof\n  ?lat=34.081&lon=-118.29\n  &include=footprint,pitch",
+        "resp": "{\n  \"footprint_sqft\": 7200,\n  \"roof_type\": \"flat\",\n  \"pitch_deg\": 0,\n  \"capture_date\": \"2026-04-02\"\n}"
+      },
+      {
+        "svc": "Tiger Data",
+        "who": "records",
+        "title": "Check history",
+        "req": "SELECT * FROM surcharges\nWHERE property='CS-77341'\n  AND work='roof' AND ends_at > now()",
+        "resp": "{\n  \"active_roof_surcharge\": true,\n  \"approved\": \"2023-07\",\n  \"ends_at\": \"2029-06\",\n  \"monthly\": 19.8\n}"
+      }
+    ],
+    "steps": [
+      [
+        "coordinator",
+        "Read the application and write the plan",
+        "done",
+        0
+      ],
+      [
+        "records",
+        "Get the building record",
+        "done",
+        1
+      ],
+      [
+        "roof",
+        "Measure the roof from above",
+        "done",
+        2
+      ],
+      [
+        "roof",
+        "Roof size matches within 3%",
+        "done"
+      ],
+      [
+        "records",
+        "Check for an active roof surcharge",
+        "fail",
+        3
+      ],
+      [
+        "rules",
+        "Same roof already charged to tenants until 2029: deny",
+        "fail"
+      ]
+    ],
+    "cross": [
+      [
+        "Roof size",
+        "CoStar: 14,400 ÷ 2 floors = 7,200",
+        "Vexcel: 7,200 sq ft",
+        "Claim: 7,400 sq ft",
+        "Size is fine (within 3%)."
+      ],
+      [
+        "Already charged?",
+        "Tiger Data: roof surcharge approved 2023",
+        "Ends June 2029",
+        "Claim: new roof charge",
+        "Tenants already pay for this roof."
+      ]
+    ],
+    "lines": [
+      [
+        "Roof size",
+        "7,400 sq ft",
+        "7,200 sq ft",
+        "ok"
+      ],
+      [
+        "Existing roof surcharge",
+        "Not mentioned",
+        "$19.80/mo until 2029",
+        "bad"
+      ],
+      [
+        "Per unit, per month",
+        "$23.13",
+        "$0",
+        "bad"
+      ]
+    ],
+    "rent": {
+      "units": 16,
+      "claimed": 23.13,
+      "verified": 0,
+      "months": 60
+    },
+    "outcome": {
+      "status": "denied",
+      "a": [
+        "Claimed",
+        "$23.13/mo",
+        "gray"
+      ],
+      "b": [
+        "Verified",
+        "$0",
+        "red"
+      ],
+      "reason": "The size checks out, but tenants are already paying a roof surcharge approved in 2023 that runs until June 2029. The same roof can't be charged twice.",
+      "note": "This roof already carries an active surcharge (approved July 2023, ends June 2029). A new roof surcharge can't be added until it ends."
+    }
+  },
+  {
+    "id": "DRW-0412",
+    "persona": "lender",
+    "party": "bbc",
+    "b": "ml",
+    "date": "Nov 12",
+    "title": "Draw 4: floor 3 interiors",
+    "amount": 400000,
+    "kind": "draw",
+    "claim": 12,
+    "measured": 9,
+    "apis": [
+      {
+        "svc": "AI model",
+        "who": "coordinator",
+        "title": "Read the document",
+        "req": "file: montrose_draw_4.pdf\ntask: extract parties, building,\n      claimed work, amounts, pay_to",
+        "resp": "{\n  \"claimed_complete\": \"Floor 3 (12 units)\",\n  \"amount_requested\": 400000\n}"
+      },
+      {
+        "svc": "CoStar",
+        "who": "records",
+        "title": "Get the building record",
+        "req": "GET /properties/search\n  ?address=Montrose Lofts,\n   Houston, TX",
+        "resp": "{\n  \"property_id\": \"CS-51877\",\n  \"name\": \"Montrose Lofts\",\n  \"property_type\": \"Multifamily\",\n  \"building_sf\": 62400,\n  \"stories\": 4,\n  \"units\": 48,\n  \"year_built\": 2026,\n  \"status\": \"Under construction\",\n  \"lat\": 29.744,\n  \"lon\": -95.39\n}"
+      },
+      {
+        "svc": "Matterport",
+        "who": "interior",
+        "title": "Look inside",
+        "req": "POST /api/models/graph   (GraphQL, server-side)\nquery {\n  model(id: \"MP-7RT\") {   # space for Montrose Lofts\n    rooms(floor: 3) {\n      label\n      classifications { label }\n      dimensions { area }   # Property Intelligence\n    }\n  }\n}",
+        "resp": "{\n  \"units_on_floor\": 12,\n  \"units_with_kitchen_and_bath_detected\": 9,\n  \"scanned\": \"2026-11-02\"\n}"
+      },
+      {
+        "svc": "Vexcel",
+        "who": "roof",
+        "title": "Look from above",
+        "req": "GET /imagery/roof\n  ?lat=29.744&lon=-95.39\n  &include=footprint,objects",
+        "resp": "{\n  \"footprint_sqft\": 15600,\n  \"roof_complete\": true,\n  \"capture_date\": \"2026-10-20\"\n}"
+      },
+      {
+        "svc": "Tiger Data",
+        "who": "records",
+        "title": "Check history",
+        "req": "SELECT sum(released) FROM draws\nWHERE loan='MTR-22' AND item='Floor 3'",
+        "resp": "{\n  \"already_released\": 0\n}"
+      }
+    ],
+    "steps": [
+      [
+        "coordinator",
+        "Read the request and write the plan",
+        "done",
+        0
+      ],
+      [
+        "records",
+        "Get the building record",
+        "done",
+        1
+      ],
+      [
+        "interior",
+        "Count finished units on floor 3",
+        "done",
+        2
+      ],
+      [
+        "roof",
+        "Check the outside from above",
+        "done",
+        3
+      ],
+      [
+        "interior",
+        "9 of 12 units finished: 75%",
+        "fail"
+      ],
+      [
+        "coordinator",
+        "Plan updated: scan is 11 days old, ask for a site photo",
+        "warn"
+      ],
+      [
+        "records",
+        "Check earlier releases",
+        "done",
+        4
+      ],
+      [
+        "rules",
+        "Release $300,000, hold $100,000",
+        "warn"
+      ]
+    ],
+    "cross": [
+      [
+        "Floor 3 progress",
+        "CoStar: 48 units over 4 floors = 12 per floor",
+        "Matterport: kitchen and bath detected in 9 of 12 units",
+        "Request: all 12 finished",
+        "75% complete, not 100%."
+      ],
+      [
+        "Building shell",
+        "CoStar: under construction",
+        "Vexcel: roof on",
+        "Request: n/a",
+        "Shell is closed in."
+      ]
+    ],
+    "lines": [
+      [
+        "Floor 3 units finished",
+        "12 of 12",
+        "9 of 12",
+        "bad"
+      ],
+      [
+        "Amount",
+        "$400,000",
+        "$300,000",
+        "bad"
+      ]
+    ],
+    "outcome": {
+      "status": "partial",
+      "a": [
+        "Release",
+        300000,
+        "green"
+      ],
+      "b": [
+        "Hold",
+        100000,
+        "amber"
+      ],
+      "reason": "The latest scan shows 9 of 12 floor-3 units finished. Releasing 75% now and holding the rest until the last 3 units are done.",
+      "note": "We've released $300,000 for the 9 finished units on floor 3. The remaining $100,000 will be released after the next scan shows units 310–312 finished."
+    }
+  },
+  {
+    "id": "DRW-0415",
+    "persona": "lender",
+    "party": "bbc",
+    "b": "ml",
+    "date": "Nov 13",
+    "title": "Draw 5: roof complete",
+    "amount": 250000,
+    "kind": "drawroof",
+    "intake": true,
+    "apis": [
+      {
+        "svc": "AI model",
+        "who": "coordinator",
+        "title": "Read the document",
+        "req": "file: montrose_draw_5.pdf\ntask: extract parties, building,\n      claimed work, amounts, pay_to",
+        "resp": "{\n  \"claimed_complete\": \"Roof\",\n  \"amount_requested\": 250000\n}"
+      },
+      {
+        "svc": "CoStar",
+        "who": "records",
+        "title": "Get the building record",
+        "req": "GET /properties/search\n  ?address=Montrose Lofts,\n   Houston, TX",
+        "resp": "{\n  \"property_id\": \"CS-51877\",\n  \"name\": \"Montrose Lofts\",\n  \"property_type\": \"Multifamily\",\n  \"building_sf\": 62400,\n  \"stories\": 4,\n  \"units\": 48,\n  \"year_built\": 2026,\n  \"status\": \"Under construction\",\n  \"lat\": 29.744,\n  \"lon\": -95.39\n}"
+      },
+      {
+        "svc": "Vexcel",
+        "who": "roof",
+        "title": "Look from above",
+        "req": "GET /imagery/roof\n  ?lat=29.744&lon=-95.39\n  &include=footprint,objects",
+        "resp": "{\n  \"footprint_sqft\": 15600,\n  \"roof_complete\": true,\n  \"rooftop_units\": 10,\n  \"capture_date\": \"2026-10-20\"\n}"
+      },
+      {
+        "svc": "Tiger Data",
+        "who": "records",
+        "title": "Check history",
+        "req": "SELECT sum(released) FROM draws\nWHERE loan='MTR-22' AND item='Roof'",
+        "resp": "{\n  \"already_released\": 0\n}"
+      }
+    ],
+    "steps": [
+      [
+        "coordinator",
+        "Read the request and write the plan",
+        "done",
+        0
+      ],
+      [
+        "records",
+        "Get the building record",
+        "done",
+        1
+      ],
+      [
+        "roof",
+        "Check roof from above: complete, 10 units installed",
+        "done",
+        2
+      ],
+      [
+        "records",
+        "Check earlier releases",
+        "done",
+        3
+      ],
+      [
+        "rules",
+        "Release $250,000",
+        "done"
+      ]
+    ],
+    "cross": [
+      [
+        "Roof",
+        "CoStar: 15,600 sq ft per floor",
+        "Vexcel: roof complete, 15,600 sq ft",
+        "Request: roof complete",
+        "Matches."
+      ]
+    ],
+    "lines": [
+      [
+        "Roof",
+        "Complete",
+        "Complete",
+        "ok"
+      ],
+      [
+        "Amount",
+        "$250,000",
+        "$250,000",
+        "ok"
+      ]
+    ],
+    "outcome": {
+      "status": "approved",
+      "a": [
+        "Release",
+        250000,
+        "green"
+      ],
+      "b": [
+        "Hold",
+        0,
+        "gray"
+      ],
+      "reason": "The aerial image shows the roof complete with all 10 units installed. Released in full."
+    }
+  },
+  {
+    "id": "CLM-2231",
+    "persona": "owner",
+    "party": "gpv",
+    "b": "wc",
+    "date": "Nov 13",
+    "title": "Restripe parking lot",
+    "amount": 6200,
+    "kind": "parking",
+    "claim": 14800,
+    "measured": 14800,
+    "intake": true,
+    "apis": [
+      {
+        "svc": "AI model",
+        "who": "coordinator",
+        "title": "Read the document",
+        "req": "file: gulf_paving.pdf\ntask: extract parties, building,\n      claimed work, amounts, pay_to",
+        "resp": "{\n  \"vendor\": \"Gulf Coast Paving\",\n  \"items\": [\n    {\n      \"work\": \"Restripe parking lot\",\n      \"qty\": 14800,\n      \"unit\": \"sq ft\",\n      \"amount\": 6200\n    }\n  ],\n  \"pay_to\": \"••7710\"\n}"
+      },
+      {
+        "svc": "Vexcel",
+        "who": "roof",
+        "title": "Look from above",
+        "req": "GET /imagery/roof\n  ?lat=29.737&lon=-95.42\n  &include=parking",
+        "resp": "{\n  \"parking_area_sqft\": 14800,\n  \"spaces\": 52,\n  \"capture_date\": \"2026-03-04\"\n}"
+      },
+      {
+        "svc": "Tiger Data",
+        "who": "records",
+        "title": "Check history",
+        "req": "SELECT approved_acct FROM vendors\nWHERE vendor='Gulf Coast Paving'",
+        "resp": "{\n  \"approved_acct\": \"••7710\",\n  \"account_matches\": true,\n  \"duplicate\": false\n}"
+      }
+    ],
+    "steps": [
+      [
+        "coordinator",
+        "Read the bill and write the plan",
+        "done",
+        0
+      ],
+      [
+        "roof",
+        "Measure the parking lot from above",
+        "done",
+        1
+      ],
+      [
+        "roof",
+        "14,800 sq ft matches the bill",
+        "done"
+      ],
+      [
+        "records",
+        "Check bank account and past payments",
+        "done",
+        2
+      ],
+      [
+        "rules",
+        "Pay $6,200 once",
+        "done"
+      ]
+    ],
+    "cross": [
+      [
+        "Lot size",
+        "Vexcel: 14,800 sq ft, 52 spaces",
+        "CoStar: parking listed",
+        "Bill: 14,800 sq ft",
+        "Matches."
+      ]
+    ],
+    "lines": [
+      [
+        "Area",
+        "14,800 sq ft",
+        "14,800 sq ft",
+        "ok"
+      ]
+    ],
+    "outcome": {
+      "status": "approved",
+      "a": [
+        "Paid",
+        6200,
+        "green"
+      ],
+      "b": [
+        "Held",
+        0,
+        "gray"
+      ],
+      "reason": "Lot size matches the aerial image. Paid once."
+    }
+  }
+]
