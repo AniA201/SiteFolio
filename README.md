@@ -123,10 +123,25 @@ Live check of the whole flow on devnet, with a test key standing in for Phantom:
 Evidence is sealed at approval, so notes the agent writes after it resumes never break Verify; an edited evidence file does.
 Approved decisions can't be undone in Review once they're on Solana, and the exported report and `decision.json` carry the receipt.
 
+## Deploy on Vultr
+The app runs on a Vultr Cloud Compute server (Ubuntu 24.04, 2 vCPU / 4 GB, New Jersey) behind Caddy, which serves
+HTTPS automatically and asks for a site password. Live demo: https://66-135-21-65.sslip.io (user `plumbline`, password
+`SITE_PASSWORD` in `backend/.env`).
+
+- `deploy/deploy.sh <ip>` builds the frontend, copies the app, keys (`backend/.env`), CoStar data and Solana wallet over
+  SSH (never through git), installs packages, restarts the service and checks `/api/health`.
+- First time only: `deploy/deploy.sh <ip> --setup <hostname> <site-password>` installs Python and Caddy, turns on the
+  firewall (SSH and HTTPS only), and sets up the `plumbline` service ([deploy/plumbline.service](deploy/plumbline.service)).
+- One worker on purpose: live state is in memory. Server settings (`PUBLIC_URL`) live in `/etc/plumbline.env`.
+- No Ollama on the server: when Groq's free per-minute limit is hit, the agent falls back across the other free Groq
+  models and waits out the minute; if that still fails, it replays the recorded plan. Run one live check at a time.
+- Logs: `ssh root@<ip> journalctl -u plumbline -f`. Delete the server after the hackathon to stop the credits.
+
 ## Open-source credits
 - Agent: [deepagents](https://github.com/langchain-ai/deepagents), LangChain, LangGraph; tracing in LangSmith (free tier).
 - Free models: OpenAI gpt-oss (open weights) and Qwen, served by Groq's free tier, with fallback to Ollama on the laptop.
 - Backend: FastAPI, Uvicorn, httpx, pydantic, pypdf, pyzipper, qrcode.
 - Frontend: React, Vite, Three.js; Matterport Showcase SDK for the 3D tours.
+- Hosting: Vultr Cloud Compute, Caddy, sslip.io.
 - Solana: solana-py, solders, @solana/web3.js, SPL Token and Memo programs, Phantom wallet (devnet).
 - Data: CoStar hackathon kit, Vexcel aerial imagery, Matterport scans (used under the hackathon's terms; not in this repo).

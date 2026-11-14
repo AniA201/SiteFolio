@@ -71,6 +71,7 @@ class FreeChatModel(BaseChatModel):
     chain: list[Any]
     names: list[str]
     retry: Any = None          # used only after every model failed once: local model with a little randomness
+    patient: bool = False      # no local model (cloud server): more rounds, waiting out the per-minute rate-limit window
     served: list[str] = []
 
     @property
@@ -84,9 +85,10 @@ class FreeChatModel(BaseChatModel):
     def _generate(self, messages: list[BaseMessage], stop: list[str] | None = None,
                   run_manager: CallbackManagerForLLMRun | None = None, **kwargs: Any) -> ChatResult:
         errors = []
-        for attempt in range(3):
+        rounds, max_wait = (6, 30.0) if self.patient else (3, 10.0)
+        for attempt in range(rounds):
             candidates = list(zip(self.names, self.chain))
-            if attempt == 2 and self.retry is not None:
+            if attempt >= 2 and self.retry is not None:
                 candidates.append((self.names[-1] + " (retry)", self.retry))
             for i, (name, model) in enumerate(candidates):
                 last = i == len(candidates) - 1
@@ -102,9 +104,9 @@ class FreeChatModel(BaseChatModel):
                     if wait:
                         _COOLDOWN[name] = time.time() + wait
                     log.warning("model %s failed, falling back: %s", name, str(e)[:120])
-            # Everyone failed this round: wait out the shortest rate-limit window (at most 10 s) and go again.
+            # Everyone failed this round: wait out the shortest rate-limit window and go again.
             pending = [t - time.time() for t in _COOLDOWN.values() if t > time.time()]
-            time.sleep(min(min(pending, default=1.0), 10.0))
+            time.sleep(min(min(pending, default=1.0), max_wait))
         raise RuntimeError("All free models failed. " + " | ".join(errors[-4:]))
 
 
@@ -114,12 +116,18 @@ def free_model(role: str = "coordinator") -> FreeChatModel:
         m = ROLE_GROQ_MODEL.get(role, ROLE_GROQ_MODEL["coordinator"])
         chain.append(_groq(m)); names.append(f"Groq {m}")
     retry = None
-    if ollama_ready():
+    local = ollama_ready()
+    if local:
         chain.append(_ollama()); names.append(f"Ollama {OLLAMA_MODEL}")
         retry = _ollama(temperature=0.5)
+    elif settings.groq_api_key:
+        # No local model (e.g. the cloud server): the other free Groq models have their own per-minute limits.
+        for other in dict.fromkeys(ROLE_GROQ_MODEL.values()):
+            if f"Groq {other}" not in names:
+                chain.append(_groq(other)); names.append(f"Groq {other}")
     if not chain:
         raise RuntimeError("No free model available: set GROQ_API_KEY or start Ollama with " + OLLAMA_MODEL)
-    return FreeChatModel(chain=chain, names=names, retry=retry, served=[])
+    return FreeChatModel(chain=chain, names=names, retry=retry, served=[], patient=not local)
 
 
 def any_free_model() -> bool:

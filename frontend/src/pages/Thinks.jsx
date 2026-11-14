@@ -61,7 +61,7 @@ export default function Thinks({ S, A }) {
         right={trace ? <a className="btn gray" href={trace} target="_blank" rel="noopener">Open LangSmith trace ↗</a>
           : <button className="btn gray" disabled>{ag ? "Trace is uploading…" : "Run live to get a trace"}</button>} />
       <div className="row wrap" style={{ marginBottom: 18, gap: 8 }}>
-        {[["Agent", "deepagents + LangGraph"], ["Models", "free: Groq gpt-oss-120b, then Ollama gpt-oss:20b on this Mac"], ["Data", "CoStar · Vexcel · Matterport"], ["Money and rent math", "plain code, no AI"]].map(([k, v]) =>
+        {[["Agent", "deepagents + LangGraph"], ["Models", "free: Groq gpt-oss and Qwen, with Ollama on the laptop as backup"], ["Data", "CoStar · Vexcel · Matterport"], ["Money and rent math", "plain code, no AI"]].map(([k, v]) =>
           <span key={k} className="tag t-ready" style={{ fontSize: 13, padding: "8px 14px" }}><b style={{ color: "var(--ink)" }}>{k}</b>&nbsp;{v}</span>)}
       </div>
       <div className="row wrap" style={{ marginBottom: 18 }}>
