@@ -10,6 +10,7 @@ from datetime import datetime
 
 from .fixtures import CLAIMS
 from .rules import build_judge_claim
+from .settings import settings
 
 STEP_DELAY = 0.55
 LOG_LIMIT = 60
@@ -161,6 +162,47 @@ class Engine:
 
     async def _run_claim(self, cid: str) -> None:
         claim = self.find(cid)
+        if settings.agent_enabled and await self._run_with_agent(cid, claim):
+            return
+        await self._replay(cid, claim)
+
+    def _push_step(self, cid: str, claim: dict, step: list) -> None:
+        if len(step) > 3:  # map the data source to the claim's call record, so the step shows its source chip
+            idx = next((i for i, a in enumerate(claim["apis"]) if a["svc"] == step[3]), None)
+            step = step[:3] + ([idx] if idx is not None else [])
+        claim["steps"].append(step)
+        self.log.insert(0, {"t": datetime.now().strftime("%H:%M:%S"), "who": WHO[step[0]], "text": f"{cid} · {step[1]}", "ok": step[2]})
+        del self.log[LOG_LIMIT:]
+        self.steps[cid] = len(claim["steps"])
+        self._changed()
+
+    async def _run_with_agent(self, cid: str, claim: dict) -> bool:
+        """Run the real deep agent; on any failure restore the recorded plan and let the replay run instead."""
+        from .agent.runner import outcome_from, run_claim
+        loop = asyncio.get_running_loop()
+        recorded = claim["steps"]
+        claim["steps"] = []
+        try:
+            proposed = await asyncio.to_thread(run_claim, claim, lambda s: loop.call_soon_threadsafe(self._push_step, cid, claim, s))
+        except Exception as e:  # network, rate limit, model refusal: the demo keeps working
+            proposed, error = None, e
+        else:
+            error = None
+        await asyncio.sleep(0)  # let queued step callbacks land
+        if not proposed:
+            claim["steps"] = recorded
+            self.steps[cid] = 0
+            self.log.insert(0, {"t": datetime.now().strftime("%H:%M:%S"), "who": "Coordinator",
+                                "text": f"{cid} · Live agent unavailable ({type(error).__name__ if error else 'no decision'}); replaying the recorded plan", "ok": "warn"})
+            return False
+        claim["outcome"] = outcome_from(proposed, claim)
+        self.steps[cid] = len(claim["steps"])
+        self.status[cid] = claim["outcome"]["status"]
+        self.current = None
+        self._changed()
+        return True
+
+    async def _replay(self, cid: str, claim: dict) -> None:
         while self.current == cid:
             cur = self.steps.get(cid, 0)
             if cur >= len(claim["steps"]):

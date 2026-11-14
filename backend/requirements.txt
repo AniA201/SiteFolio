@@ -1,9 +1,11 @@
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
-pydantic==2.10.4
+pydantic==2.14.3
 python-dotenv==1.0.1
 httpx==0.28.1
 pyzipper==0.3.6
 anthropic==2.8.0
 pypdf==7.1.0
 python-multipart==0.0.33
+deepagents==0.7.38
+langchain-anthropic==1.7.10

@@ -54,6 +54,8 @@ Real buildings: after the keys are set, fetch and build the real data set (kept 
 .venv/bin/python -m app.real.fetch && .venv/bin/python -m app.real.build
 ```
 
+Deep agent: with `ANTHROPIC_API_KEY` set, each check runs the LangChain deep agent in `backend/app/agent/` (a coordinator on Claude Opus 5.5 with roof, interior and records helpers, plain-code money tools, and a pause before any decision). Its plan and tool calls stream into the claim's steps. Without a key, or if a run fails, the recorded plan replays. `PLUMBLINE_AGENT=replay` forces the replay; `LANGSMITH_API_KEY` turns on tracing.
+
 Tests:
 
 ```bash
