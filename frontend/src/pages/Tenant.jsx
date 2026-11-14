@@ -1,8 +1,10 @@
 import { BUILDINGS } from "../data";
+import { useState } from "react";
 import { Check, FINAL, Flag, Head } from "../lib";
 import { Aerial, FloorPlan } from "../components/Illustrations";
 
 export default function Tenant({ S, A, id }) {
+  const [copied, setCopied] = useState("");
   const ready = S.all.filter(c => c.persona === "reviewer" && FINAL.includes(S.status[c.id]));
   const c = ready.find(x => x.id === id) || ready[0];
   if (!c) return (
@@ -39,8 +41,11 @@ export default function Tenant({ S, A, id }) {
             <p style={{ color: "rgba(255,255,255,.75)" }}>less over {r.months / 12} years, per apartment. Status: {S.review[c.id] ? "reviewer decision recorded" : "waiting for the reviewer's final decision"}.</p>
           </div>
           <div className="row wrap" style={{ marginTop: 18 }}>
-            <button className="btn black sm">Share with my tenant association</button>
-            <button className="btn gray sm">Download the proof</button>
+            <button className="btn black sm" onClick={() => {
+              const link = `${location.origin}/api/claims/${c.id}/report?audience=tenant`;
+              navigator.clipboard?.writeText(link).then(() => setCopied("Link copied. Paste it to your tenant association."), () => setCopied(link));
+            }}>Share with my tenant association</button>
+            <a className="btn gray sm" href={`/api/claims/${c.id}/report?audience=tenant&download=1`} style={{ textDecoration: "none" }}>Download the proof</a>
           </div>
         </div>
         <div className="grid" style={{ gap: 16 }}>
@@ -56,6 +61,7 @@ export default function Tenant({ S, A, id }) {
           )}
         </div>
       </div>
+      {copied && <div className="small" style={{ marginTop: 10, color: "var(--amberDeep)", fontWeight: 600, wordBreak: "break-all" }}>{copied}</div>}
       <div style={{ marginTop: 16 }}><Flag t={B.real ? "Real building and measurements · sample application · not legal advice" : "Sample building · plain-language page, not legal advice"} /></div>
     </div>
   );

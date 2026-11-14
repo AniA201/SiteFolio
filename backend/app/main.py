@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from .engine import Engine
 from .fixtures import BUILDINGS, META, PARTIES, PERSONAS, SURCHARGES, USING_REAL
 from .routes_data import router as data_router
+from .routes_report import router as report_router
 from .settings import settings
 
 engine: Engine
@@ -25,6 +26,7 @@ engine: Engine
 async def lifespan(_: FastAPI):
     global engine
     engine = Engine()
+    _.state.engine = engine
     engine.start()
     yield
     await engine.stop()
@@ -157,6 +159,7 @@ def reset_everything():
 
 
 app.include_router(data_router)
+app.include_router(report_router)
 
 
 # ---------- built frontend (production) ----------
