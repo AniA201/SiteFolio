@@ -1,9 +1,10 @@
 """Read-only routes onto the building data layers. Each answers 503 with a plain message until its key is set."""
 from functools import lru_cache
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from .integrations.matterport import MatterportClient, MatterportError, ModelIndex, total_sqft
+from .integrations.vexcel import VexcelClient, VexcelError
 from .settings import settings
 
 router = APIRouter(prefix="/api/data")
@@ -47,3 +48,19 @@ def model_rooms(model_id: str):
     return {"rooms": [{"id": r.id, "floor": r.floor_label, "label": r.label, "confidence": r.confidence,
                        "area_sqm": r.area_sqm, "area_sqft": None if r.area_sqft is None else round(r.area_sqft, 1)} for r in rooms],
             "total_sqft": round(total_sqft(rooms), 1)}
+
+
+@lru_cache(maxsize=64)
+def _ortho(lat: float, lon: float, half_side_m: float, pixels: int) -> bytes:
+    return VexcelClient(settings.vexcel_api_key or "").ortho(lat, lon, half_side_m, pixels)
+
+
+@router.get("/vexcel/ortho.jpg")
+def vexcel_ortho(lat: float, lon: float, half_side_m: float = Query(70, gt=5, le=500), pixels: int = Query(1400, ge=200, le=4000)):
+    if not settings.vexcel_api_key:
+        raise HTTPException(503, "Vexcel API key is not set (VEXCEL_API_KEY).")
+    try:
+        img = _ortho(round(lat, 6), round(lon, 6), half_side_m, pixels)
+    except VexcelError as e:
+        raise HTTPException(502, str(e))
+    return Response(img, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
