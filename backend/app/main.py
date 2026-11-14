@@ -191,7 +191,12 @@ def retry(cid: str):
 def decision(cid: str, body: Decision):
     claim = _claim_or_404(cid)
     engine.decide(cid, body.action)
-    tiger.record(cid, claim["persona"], "decision", {"action": body.action})
+    o = claim["outcome"]
+    approved = body.action in ("ok", "sent") and o["status"] in ("approved", "partial")
+    num = lambda v: float(v) if approved and isinstance(v, (int, float)) else 0
+    # Paid and held amounts make the weekly aggregate show money, not just event counts.
+    tiger.record(cid, claim["persona"], "decision", {"action": body.action, "status": o["status"]},
+                 paid=num(o["a"][1]), held=num(o["b"][1]))
     solana_after_decision(engine, cid, body.action)  # public receipt on Solana devnet, in the background
     return engine.snapshot()
 
