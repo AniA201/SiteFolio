@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from .engine import Engine
 from .fixtures import BUILDINGS, PARTIES, PERSONAS, SURCHARGES
+from .routes_data import router as data_router
 from .settings import settings
 
 engine: Engine
@@ -150,6 +151,9 @@ def reset_everything():
     engine.reset_all()
     engine._changed()
     return engine.snapshot()
+
+
+app.include_router(data_router)
 
 
 # ---------- built frontend (production) ----------
