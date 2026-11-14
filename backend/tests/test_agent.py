@@ -251,3 +251,9 @@ def test_app_starts_without_tiger_when_it_cannot_connect():
     t = TigerHistory("postgresql://nobody:wrong@127.0.0.1:1/none")
     t.initialize()  # must not raise
     assert not t.enabled
+
+
+def test_reset_still_works_when_tiger_is_unreachable():
+    from app.tiger import TigerHistory
+    t = TigerHistory("postgresql://nobody:wrong@127.0.0.1:1/none")
+    t.clear_claims()  # must not raise, so the Reset demo button keeps working

@@ -184,8 +184,11 @@ class TigerHistory:
             return
         with self._lock:
             self._claims.clear()
-        with connect(self.url) as db:
-            db.execute("DELETE FROM claim_state WHERE claim_id LIKE %s", (f"{self.instance}:%",))
+        try:
+            with connect(self.url, connect_timeout=10) as db:
+                db.execute("DELETE FROM claim_state WHERE claim_id LIKE %s", (f"{self.instance}:%",))
+        except Exception as e:  # Tiger unreachable: the demo still resets; the next saves overwrite the old rows
+            log.error("Tiger clear failed, resetting anyway: %s", str(e).splitlines()[0][:200])
 
     def active_surcharges(self, property_id, work):
         if not self.enabled:
