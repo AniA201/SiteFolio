@@ -28,7 +28,7 @@ def fmt_int(n: int) -> str:
 def build_judge_claim(area: int, amount: int, bank: str, hidden: str, n: int) -> dict:
     cid = f"JDG-{n:02d}"
     ok = not payment_checks("••" + bank, "••" + APPROVED_ACCT, already_paid=False).blocked
-    roof = check_roof(VERIFIED_ROOF, 0, area)
+    roof = check_roof(VERIFIED_ROOF, 0, area, shape=(TARGET.get("pitch") or "flat").lower())
     inflated = roof.inflated
     inj = bool(hidden) and bool(INJECT_RE.search(hidden))
     pay = 0 if not ok else pay_verified_share(amount, area, roof.surface, roof.allowed).pay

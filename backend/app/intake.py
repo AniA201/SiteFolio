@@ -219,7 +219,7 @@ def build_claim(x: Extracted, filename: str, cid: str) -> dict:
 
     verified, claimed, label, unit = None, x.quantity, None, x.unit or ""
     if x.kind == "roof" and claimed and "Vexcel" in idx:
-        roof = money.check_roof(B["roof"], 0, claimed)
+        roof = money.check_roof(B["roof"], 0, claimed, shape=(B.get("pitch") or "flat").lower())
         split = money.pay_verified_share(amount, claimed, roof.surface, roof.allowed)
         verified, label, unit = B["roof"], "Roof area", "sq ft"
         steps += [["roof", "Measure the roof from above", "done", idx["Vexcel"]],

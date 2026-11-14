@@ -84,4 +84,8 @@ def building(pid: str):
     if out["vexcel"] and b.get("gba_sqft") and b.get("stories"):
         plate = b["gba_sqft"] / b["stories"]
         out["roof_cross_check"] = {"floor_plate_sqft": round(plate), "agreement_pct": round(abs(out["vexcel"]["footprint_sqft"] / plate - 1) * 100)}
+    if out["vexcel"]:
+        from .money import check_roof
+        r = check_roof(out["vexcel"]["footprint_sqft"], 0, 0, shape=out["vexcel"]["roof_shape"] or "flat")
+        out["roof_surface"] = {"surface_sqft": round(r.surface), "allowed_sqft": round(r.allowed), "formula": r.formula}
     return out
