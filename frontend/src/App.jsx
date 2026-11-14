@@ -11,10 +11,11 @@ import Tenant from "./pages/Tenant";
 import History from "./pages/History";
 import Thinks from "./pages/Thinks";
 import Fool from "./pages/Fool";
+import Buildings from "./pages/Buildings";
 import FoolPhone from "./pages/FoolPhone";
 
-const NAV = [["overview", "Overview"], ["claims", "Claims"], ["review", "Review"], ["tenant", "Tenant view"], ["history", "History"], ["thinks", "How it thinks"]];
-const PARENT = { claim: "claims" };
+const NAV = [["overview", "Overview"], ["claims", "Claims"], ["buildings", "Buildings"], ["review", "Review"], ["tenant", "Tenant view"], ["history", "History"], ["thinks", "How it thinks"]];
+const PARENT = { claim: "claims", building: "buildings" };
 
 const readHash = () => {
   const [page, id] = (location.hash || "#/overview").slice(2).split("/");
@@ -63,6 +64,8 @@ export default function App() {
     history: <History {...P} />,
     thinks: <Thinks key={persona} {...P} />,
     fool: <Fool {...P} />,
+    buildings: <Buildings {...P} />,
+    building: <Buildings key={id} {...P} id={id} />,
   }[page] || <Overview {...P} />;
 
   if (page === "fool-it") return state.rev >= 0 ? <FoolPhone {...P} /> : null;

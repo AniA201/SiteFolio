@@ -22,6 +22,22 @@ from .selection import SELECTION
 REAL = Path(__file__).resolve().parents[1] / "data" / "real"
 CACHE = REAL / "cache"
 SAMPLE = Path(__file__).resolve().parents[1] / "data"
+_DOSSIER_FILE = REAL / "kit_dossiers.json"
+DOSSIERS = json.loads(_DOSSIER_FILE.read_text()) if _DOSSIER_FILE.exists() else {}
+
+
+def dossier_summary(d: dict) -> dict:
+    """The CoStar kit facts shown on the building panel: rents, tenants, last sale, listings."""
+    out = {}
+    if a := d.get("apartments"):
+        out["apartments"] = {k: a.get(k) for k in ("min_rent", "max_rent", "median_plan_rent", "available", "manager")} | {"plans": len(a.get("plans") or [])}
+    if t := d.get("tenants"):
+        out["tenants"] = {"count": t["count"], "occupied_sqft": t["occupied_sqft"], "top": t["list"][:5]}
+    if s := d.get("last_sale"):
+        out["last_sale"] = s
+    if l := d.get("listings"):
+        out["listings"] = l[:3]
+    return out
 
 J = lambda o: json.dumps(o, indent=2, ensure_ascii=False)
 n0 = lambda x: f"{round(x):,}"
@@ -42,6 +58,7 @@ class Facts:
         self.vx_attrs = feats[0]["properties"] if feats else {}
         self.vx = parse_property(self.vx_attrs)
         self.ac_views = d.get("ac_views")
+        self.dossier = DOSSIERS.get(self.rec["id"], {})
         self.models = {mid: {"name": m["basics"]["name"], "basics": m["basics"], "rooms": parse_rooms(m["rooms"]), "raw_rooms": m["rooms"]}
                        for mid, m in d["matterport"].items()}
 
@@ -61,7 +78,8 @@ class Facts:
                 "roof_material": p.roof_material if p else None, "roof_condition": p.roof_condition if p else None,
                 "built": r["year_built"], "renovated": r["year_renovated"], "lat": r["lat"], "lon": r["lon"],
                 "units": r["units"], "parking_spaces": r["parking_spaces"], "vexcel_collection": self.vx.collection,
-                "matterport_models": [{"id": mid, "name": m["name"]} for mid, m in self.models.items()], "real": True}
+                "matterport_models": [{"id": mid, "name": m["name"]} for mid, m in self.models.items()], "real": True,
+                "dossier": dossier_summary(self.dossier)}
 
     # ----- API call records, built from the real cached responses (trimmed) -----
     def call_costar(self) -> dict:
@@ -225,36 +243,49 @@ def owner_claims(v: Facts) -> list[dict]:
     return out
 
 
+def advertised_sqft(name: str) -> int | None:
+    m = re.search(r"([\d,]{3,5})\s*SF", name.replace("\xa0", " "), re.I)
+    return int(m.group(1).replace(",", "")) if m else None
+
+
 def reviewer_claims(c: Facts, w: Facts) -> list[dict]:
     out = []
     B = c.building(); units = B["units"]
-    plans = {mid: m for mid, m in c.models.items() if "amenit" not in m["name"].lower()}
+    plans = {mid: m for mid, m in c.models.items() if advertised_sqft(m["name"]) or re.search(r"\d\s*BR|studio|plan", m["name"], re.I)}
+    plans = {mid: m for mid, m in plans.items() if total_sqft(m["rooms"]) > 150}
     unit_areas = [total_sqft(m["rooms"]) for m in plans.values()]
     avg_unit = sum(unit_areas) / len(unit_areas)
-    roof_claim, roof_rate = 22_500, 3.0
+    listing = (c.dossier.get("apartments") or {})
+    lp = [p for p in listing.get("plans") or [] if p.get("min_sqft")]
+    listed_avg = sum(p["min_sqft"] * (p.get("units") or 1) for p in lp) / max(1, sum(p.get("units") or 1 for p in lp)) if lp else None
+    median_rent = listing.get("median_plan_rent")
+    fp = c.footprint
+    roof_claim, roof_rate = int(round(fp * 1.5 / 500) * 500), 3.0
     floor_per_unit, floor_rate = 900, 3.0
     floor_claim = floor_per_unit * units
     roof_amt, floor_amt = roof_claim * roof_rate, floor_claim * floor_rate
     total = roof_amt + floor_amt
-    fp = c.footprint
     verified_total = money.verified_cost([(roof_claim, roof_amt, fp), (floor_claim, floor_amt, avg_unit * units)])
     claimed_rent, verified_rent = money.rent_surcharge(total, units), money.rent_surcharge(verified_total, units)
-    out.append({"id": "RSO-3104", "persona": "reviewer", "party": "wcl", "b": "cochran", "date": "Nov 9", "title": "Roof and unit flooring", "amount": total, "kind": "rent", "claim": roof_claim, "measured": round(fp),
-        "apis": [ai("cochran_terrace_application.pdf", {"units": units, "items": [{"work": "Roof", "qty": roof_claim, "amount": roof_amt}, {"work": "Unit flooring", "qty": floor_claim, "per_unit": floor_per_unit, "amount": floor_amt}], "total_claimed": total}),
+    second_floor = (f"Apartments.com listing (CoStar): {len(lp)} plans average {n0(listed_avg)} sq ft" if listed_avg
+                    else f"CoStar: {units} units")
+    rent_ctx = {"median_rent": median_rent, "claimed_pct": round(claimed_rent / median_rent * 100, 1), "verified_pct": round(verified_rent / median_rent * 100, 1)} if median_rent else None
+    out.append({"id": "RSO-3104", "persona": "reviewer", "party": "wcl", "b": c.key, "date": "Nov 9", "title": "Roof and unit flooring", "amount": total, "kind": "rent", "claim": roof_claim, "measured": round(fp),
+        "apis": [ai(f"{c.key}_application.pdf", {"units": units, "items": [{"work": "Roof", "qty": roof_claim, "amount": roof_amt}, {"work": "Unit flooring", "qty": floor_claim, "per_unit": floor_per_unit, "amount": floor_amt}], "total_claimed": total}),
                  c.call_costar(), c.call_vexcel(), c.call_matterport(list(plans), note=f"{len(plans)} floor plans scanned"),
                  tiger(f"SELECT * FROM surcharges\nWHERE property='{B['cs']}'\n  AND work='roof' AND ends_at > now()", {"active_roof_surcharge": False})],
-        "steps": [["coordinator", "Read the application and write the plan", "done", 0], ["records", "Get the building record", "done", 1],
+        "steps": [["coordinator", "Read the application and write the plan", "done", 0], ["records", "Get the building record and rent listing", "done", 1],
                   ["roof", "Measure the roof from above", "done", 2], ["interior", f"Measure the {len(plans)} scanned floor plans", "done", 3],
                   ["roof", f"Roof: {n0(fp)} sq ft vs {n0(roof_claim)} claimed", "fail"],
                   ["interior", f"Flooring: about {n0(avg_unit)} sq ft per unit vs {n0(floor_per_unit)} claimed", "fail"],
                   ["coordinator", "Plan updated: request contractor photos", "warn"], ["records", "Check for an active roof surcharge", "done", 4],
                   ["rules", f"Rent math: ${verified_rent:.2f} per unit, not ${claimed_rent:.2f}", "warn"]],
         "cross": [["Roof size", f"CoStar: {n0(B['size'])} ÷ {B['floors']} floors = {n0(c.floor_plate)}", f"Vexcel: {n0(fp)} sq ft, {B['pitch'].lower()}", f"Claim: {n0(roof_claim)} sq ft", f"Roof is {abs(pct(fp, roof_claim))}% smaller than claimed."],
-                  ["Unit flooring", f"CoStar: {units} units", f"Matterport: {len(plans)} floor plans average {n0(avg_unit)} sq ft", f"Claim: {n0(floor_per_unit)} sq ft per unit", f"Flooring is {abs(pct(avg_unit, floor_per_unit))}% smaller than claimed."]],
+                  ["Unit flooring", second_floor, f"Matterport: {len(plans)} floor plans average {n0(avg_unit)} sq ft", f"Claim: {n0(floor_per_unit)} sq ft per unit", f"Flooring is {abs(pct(avg_unit, floor_per_unit))}% smaller than claimed."]],
         "lines": [["Roof", f"{n0(roof_claim)} sq ft · {usd(roof_amt)}", f"{n0(fp)} sq ft · {usd(fp * roof_rate)}", "bad"],
                   ["Unit flooring", f"{n0(floor_claim)} sq ft · {usd(floor_amt)}", f"{n0(avg_unit * units)} sq ft · {usd(avg_unit * units * floor_rate)}", "bad"],
                   ["Per unit, per month", f"${claimed_rent:.2f}", f"${verified_rent:.2f}", "bad"]],
-        "rent": {"units": units, "claimed": claimed_rent, "verified": verified_rent, "months": 60},
+        "rent": {"units": units, "claimed": claimed_rent, "verified": verified_rent, "months": 60, **({"context": rent_ctx} if rent_ctx else {})},
         "tenant": {"inside_label": f"Average apartment, measured inside ({len(plans)} floor plans)", "inside_value": f"{n0(avg_unit)} sq ft"},
         "outcome": {"status": "reduced", "a": ["Claimed", f"${claimed_rent:.2f}/mo", "gray"], "b": ["Verified", f"${verified_rent:.2f}/mo", "amber"],
                     "reason": f"The roof and the apartments are both smaller than the application says. Under the 50% / 60-month formula, the fair surcharge is ${verified_rent:.2f} per unit per month.",
@@ -283,8 +314,12 @@ def lender_claims(l: Facts) -> list[dict]:
     B = l.building(); out = []
     scanned = {plan_code(m["name"]): (mid, m) for mid, m in l.models.items() if plan_code(m["name"])}
     finished = {code for code, (_, m) in scanned.items() if {"Kitchen", "Bathroom"} <= {r.label for r in m["rooms"]}}
-    letters = sorted({c[0] for c in scanned})
-    claimed = [f"{a}{i}" for a in letters for i in range(1, max(int(c[1:]) for c in scanned if c[0] == a) + 1)]
+    listed = [p["name"] for p in (l.dossier.get("apartments") or {}).get("plans") or [] if p.get("name")]
+    if listed:  # the Apartments.com listing in the CoStar kit says which floor plans the building has
+        claimed = sorted(listed, key=lambda c: (c[0], int(c[1:]) if c[1:].isdigit() else 0))
+    else:
+        letters = sorted({c[0] for c in scanned})
+        claimed = [f"{a}{i}" for a in letters for i in range(1, max(int(c[1:]) for c in scanned if c[0] == a) + 1)]
     missing = [c for c in claimed if c not in scanned]
     requested = 600_000
     split = money.release_draw(requested, len(finished & set(claimed)), len(claimed))
@@ -296,14 +331,14 @@ def lender_claims(l: Facts) -> list[dict]:
         "steps": [["coordinator", "Read the request and write the plan", "done", 0], ["records", "Get the building record", "done", 1],
                   ["interior", "Check each floor plan for a finished kitchen and bath", "done", 2], ["roof", "Check the outside from above", "done", 3],
                   ["interior", f"{len(finished)} of {len(claimed)} floor plans verified; no scan for {', '.join(missing)}", "fail"],
-                  ["coordinator", f"Plan updated: ask for site photos of {' and '.join(missing)}", "warn"], ["records", "Check earlier releases", "done", 4],
+                  ["coordinator", f"Plan updated: ask for site photos of {', '.join(missing)}", "warn"], ["records", "Check earlier releases", "done", 4],
                   ["rules", f"Release {usd(split.pay)}, hold {usd(split.hold)}", "warn"]],
-        "cross": [["Unit interiors", f"CoStar: {B['units']} units, built {B['built']}", f"Matterport: kitchen and bath found in {len(finished)} of {len(claimed)} floor plans", f"Request: all {len(claimed)} finished", f"{len(finished)} verified; {', '.join(missing)} not scanned yet."],
+        "cross": [["Unit interiors", (f"CoStar (Apartments.com listing): {len(claimed)} floor plans, {', '.join(claimed[:3])}…" if listed else f"CoStar: {B['units']} units, built {B['built']}"), f"Matterport: kitchen and bath found in {len(finished)} of {len(claimed)} floor plans", f"Request: all {len(claimed)} listed floor plans finished", f"{len(finished)} verified; {', '.join(missing)} not scanned yet."],
                   ["Building shell", f"CoStar: {B['floors']} floors, {n0(B['size'])} sq ft", f"Vexcel: {B['pitch'].lower()} roof, {n0(l.footprint)} sq ft footprint", "Request: n/a", "Shell is closed in."]],
         "lines": [["Floor plans finished", f"{len(claimed)} of {len(claimed)}", f"{len(finished)} of {len(claimed)}", "bad"], ["Amount", usd(requested), usd(split.pay), "bad"]],
         "outcome": {"status": "partial", "a": ["Release", split.pay, "green"], "b": ["Hold", split.hold, "amber"],
-                    "reason": f"The 3D scans show finished kitchens and baths in {len(finished)} of {len(claimed)} floor plans. Plans {' and '.join(missing)} have no scan yet, so their share is held until a scan or site photos arrive.",
-                    "note": f"We've released {usd(split.pay)} for the {len(finished)} floor plans verified in the 3D scans. The remaining {usd(split.hold)} will be released once plans {' and '.join(missing)} are scanned or photographed."}})
+                    "reason": f"The 3D scans show finished kitchens and baths in {len(finished)} of {len(claimed)} floor plans. Plans {', '.join(missing)} have no scan yet, so their share is held until a scan or site photos arrive.",
+                    "note": f"We've released {usd(split.pay)} for the {len(finished)} floor plans verified in the 3D scans. The remaining {usd(split.hold)} will be released once plans {', '.join(missing)} are scanned or photographed."}})
     out.append({"id": "DRW-0415", "persona": "lender", "party": "bbc", "b": "lenox", "date": "Nov 13", "title": "Draw 5: roof complete", "amount": 250_000, "kind": "drawroof", "intake": True,
         "apis": [ai("lenox_draw_5.pdf", {"claimed_complete": "Roof", "amount_requested": 250000}), l.call_costar(), l.call_vexcel(),
                  tiger("SELECT sum(released) FROM draws\nWHERE loan='LNX-25' AND item='Roof'", {"already_released": 0})],
@@ -323,7 +358,7 @@ def stories(claims: dict, b: dict) -> dict:
         "owner": [["The roof that shrank", f"A roofer billed {n0(r['claim'])} sq ft at {b['vine']['name']}. The building record and the aerial survey both say about {n0(r['measured'])}.", "CLM-2207", "vine"],
                   [f"{ac['claim']} units billed, {ac['measured']} on the roof", f"The straight-down and angled aerial views both count about {ac['measured']} rooftop AC units. The bill says {ac['claim']}.", "CLM-2214", "vine"],
                   ["\"We changed banks.\"", "A bill asked to pay a new account. Plumbline paid $0 and opened a review.", "CLM-2223", "vine"]],
-        "reviewer": [["Rent up for a roof a third smaller", f"A landlord claimed {n0(rso['claim'])} sq ft of roof at {b['cochran']['name']}. The building has {n0(rso['measured'])}. Tenants would overpay for 5 years.", "RSO-3104", "cochran"],
+        "reviewer": [["Rent up for a roof a third smaller", f"A landlord claimed {n0(rso['claim'])} sq ft of roof at {b['tamarind']['name']}. The building has {n0(rso['measured'])}. Tenants would overpay for 5 years.", "RSO-3104", "tamarind"],
                      ["The same roof, charged twice", f"Tenants at {b['westmoreland']['name']} already pay for this roof until 2029. The history check catches it.", "RSO-3104", "westmoreland"]],
         "lender": [[f"{drw['measured']} of {drw['claim']} floor plans verified", f"The builder asked for {usd(drw['amount'])} for finished interiors at {b['lenox']['name']}. The 3D scans verify {drw['measured']} of {drw['claim']} floor plans.", "DRW-0412", "lenox"],
                    ["Release money for real progress", "Check the building from your desk before every loan payment.", "DRW-0412", "lenox"]],
@@ -333,13 +368,13 @@ def stories(claims: dict, b: dict) -> dict:
 def build() -> None:
     facts = {k: Facts(k) for k in SELECTION}
     buildings = {k: f.building() for k, f in facts.items()}
-    claims = owner_claims(facts["vine"]) + reviewer_claims(facts["cochran"], facts["westmoreland"]) + lender_claims(facts["lenox"])
+    claims = owner_claims(facts["vine"]) + reviewer_claims(facts["tamarind"], facts["westmoreland"]) + lender_claims(facts["lenox"])
     by_id = {c["id"]: c for c in claims}
     parties = json.loads((SAMPLE / "parties.json").read_text())
-    parties["wcl"] = {"name": "Cochran Terrace Owner LLC", "role": "Landlord", "acct": "—", "memory": "First application in our records."}
+    parties["wcl"] = {"name": "Tamarind Apartments Owner LLC", "role": "Landlord", "acct": "—", "memory": "First application in our records."}
     parties["vgl"] = {"name": "Westmoreland Owner LLC", "role": "Landlord", "acct": "—", "memory": "Roof surcharge approved in 2023, still active."}
     parties["gpv"] = {"name": "Gulf Coast Floors", "role": "Contractor", "acct": "••7710", "memory": "Charges by finished area. History is clean."}
-    W, C = buildings["westmoreland"], buildings["cochran"]
+    W, C = buildings["westmoreland"], buildings["tamarind"]
     surcharges = [{"property_id": W["cs"], "building": W["name"], "work": "Roof", "approved": "2023-07", "ends": "2029-06", "per_unit": "$19.80"},
                   {"property_id": C["cs"], "building": C["name"], "work": "Seismic retrofit", "approved": "2021-03", "ends": "2027-02", "per_unit": "$38.00"}]
     personas = json.loads((SAMPLE / "personas.json").read_text())
