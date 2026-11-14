@@ -26,8 +26,8 @@ tiger = TigerHistory()
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     global engine
-    engine = Engine()
     tiger.initialize()
+    engine = Engine(history=tiger)
     engine.start()
     yield
     await engine.stop()

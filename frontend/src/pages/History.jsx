@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api";
 import { Flag, Head } from "../lib";
 
-const LABELS = { reviewer: ["Checked", "Reduced or denied", "applications"], lender: ["Released", "Held", "$ thousands"], owner: ["Paid", "Held", "$ thousands"] };
+const LABELS = { reviewer: "Events", lender: "Events", owner: "Events" };
 
 const DOUBLE_CHARGE_SQL = `SELECT * FROM surcharge_registry
 WHERE property_id = $1 AND lower(work) = lower($2)
@@ -17,8 +17,8 @@ export default function History({ S, A }) {
   const [history, setHistory] = useState(null);
   useEffect(() => { let active = true; api.history(S.persona).then(v => { if (active) setHistory(v); }).catch(() => { if (active) setHistory(null); }); return () => { active = false; }; }, [S.persona, S.log.length]);
   const weekly = [...(history?.weekly || [])].reverse();
-  const data = weekly.map(w => [Number(w.paid), Number(w.held)]);
-  const max = Math.max(...data.map(d => d[0] + d[1]), 1);
+  const data = weekly.map(w => Number(w.events));
+  const max = Math.max(...data, 1);
   const lab = LABELS[S.persona];
   const stats = [["Events stored", history?.connected ? history.events.toLocaleString() : "—", "documents, checks, decisions"], ["Active surcharges", history?.connected ? history.surcharges.filter(s => new Date(s.ends) >= new Date()).length : "—", "registry records"], ["Weekly buckets", history?.connected ? weekly.length : "—", "continuous aggregate"]];
   return (
@@ -29,12 +29,11 @@ export default function History({ S, A }) {
       </div>
       <section className="grid g32">
         <div className="tile">
-          <div className="row between"><h4>{lab[0]} vs {lab[1]}, per week ({lab[2]})</h4></div>
+          <div className="row between"><h4>{lab} stored per week</h4></div>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 14, height: 220, marginTop: 24, paddingBottom: 26 }}>
             {data.map((d, i) => (
               <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%", position: "relative" }}>
-                <div style={{ height: (d[1] / max) * 100 + "%", background: "var(--amber)", borderRadius: "6px 6px 0 0" }} />
-                <div style={{ height: (d[0] / max) * 100 + "%", background: "#000", borderRadius: d[1] ? 0 : "6px 6px 0 0" }} />
+                <div style={{ height: (d / max) * 100 + "%", background: "#000", borderRadius: "6px 6px 0 0" }} />
                 <span className="small muted" style={{ position: "absolute", bottom: -24, left: 0, right: 0, textAlign: "center" }}>{new Date(weekly[i].week).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
               </div>
             ))}

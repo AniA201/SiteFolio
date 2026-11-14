@@ -18,7 +18,8 @@ WHO = {"coordinator": "Coordinator", "roof": "Roof inspector", "interior": "Inte
 
 
 class Engine:
-    def __init__(self) -> None:
+    def __init__(self, history=None) -> None:
+        self.history = history
         self.reset_all()
         self._subs: set[asyncio.Queue] = set()
         self._wake = asyncio.Event()
@@ -153,6 +154,8 @@ class Engine:
             cur = self.steps.get(cid, 0)
             if cur >= len(claim["steps"]):
                 self.status[cid] = claim["outcome"]["status"]
+                if self.history:
+                    self.history.record(cid, claim["persona"], "check_completed", {"status": self.status[cid]})
                 self.current = None
                 self._changed()
                 return
