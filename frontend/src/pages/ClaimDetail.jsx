@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BUILDINGS, PARTIES, PERSONAS } from "../data";
 import { COL, Check, Flag, J, LAYER, SvcChip, Tag, WHO, aerialKind, fmt, isLayer, money, sqft } from "../lib";
 import { Aerial, FloorPlan } from "../components/Illustrations";
+import MatterportTour, { toursFromCall } from "../components/MatterportTour";
 
 const TABS = [["run", "Agent run"], ["apis", "Building data calls"], ["cross", "Cross-checks"], ["evidence", "Evidence"]];
 const MEASURED_KINDS = ["roof", "rent", "rentdup", "parking"];
@@ -62,6 +63,7 @@ function RunTab({ S, A, c, step, done, mine, reached, setTab }) {
   const o = c.outcome, B = BUILDINGS[c.b];
   const idx = svc => c.apis.findIndex(a => a.svc === svc);
   const vi = idx("Vexcel"), mi = idx("Matterport"), ci = idx("CoStar");
+  const tours = B.real && mi >= 0 ? toursFromCall(c.apis[mi]) : [];
   return (
     <section className="grid g32" style={{ alignItems: "start" }}>
       <div>
@@ -128,11 +130,16 @@ function RunTab({ S, A, c, step, done, mine, reached, setTab }) {
         {mi >= 0 && (
           <div className="tile" style={{ opacity: reached(mi) ? 1 : .45 }}>
             <div className="row between"><h4>Inside · 3D tour</h4><SvcChip s="Matterport" /></div>
-            <div className="ph" style={{ marginTop: 14, position: "relative" }}>
-              <FloorPlan show={reached(mi)} mode={c.persona === "reviewer" ? "apt" : c.persona === "lender" ? "units" : null} />
-              <span className="tag" style={{ position: "absolute", top: 10, right: 10, background: "#0A0A0A", color: "#fff" }}>▶ Live 3D tour in the real app</span>
-            </div>
-            <div className="muted small" style={{ marginTop: 10 }}>In the real app this panel is the live Matterport tour (Embed SDK), with pins on each measured room. Room areas come from the Model API.</div>
+            {tours.length > 0 ? <>
+              <MatterportTour tours={tours} show={reached(mi)} />
+              <div className="muted small" style={{ marginTop: 10 }}>Live Matterport tour of the scanned space. Room areas come from the Model API.</div>
+            </> : <>
+              <div className="ph" style={{ marginTop: 14, position: "relative" }}>
+                <FloorPlan show={reached(mi)} mode={c.persona === "reviewer" ? "apt" : c.persona === "lender" ? "units" : null} />
+                <span className="tag" style={{ position: "absolute", top: 10, right: 10, background: "#0A0A0A", color: "#fff" }}>▶ Live 3D tour in the real app</span>
+              </div>
+              <div className="muted small" style={{ marginTop: 10 }}>In the real app this panel is the live Matterport tour (Embed SDK), with pins on each measured room. Room areas come from the Model API.</div>
+            </>}
           </div>
         )}
         <RulesBox c={c} done={done} />

@@ -68,7 +68,9 @@ def health():
 @app.get("/api/meta")
 def meta():
     return {"buildings": BUILDINGS, "parties": PARTIES, "personas": PERSONAS, "surcharges": SURCHARGES,
-            "meta": META, "real": USING_REAL}
+            "meta": META, "real": USING_REAL,
+            # Browser-safe by design (Matterport SDK keys are domain-locked); every other key stays server-side.
+            "matterport_sdk_key": settings.matterport_sdk_key}
 
 
 @app.get("/api/state")
