@@ -44,6 +44,16 @@ Keys: from `backend/`, run `.venv/bin/python setup_keys.py`. It asks for each ke
 .venv/bin/python -m app.integrations.costar
 ```
 
+Real buildings: after the keys are set, fetch and build the real data set (kept local in `backend/app/data/real/`, gitignored). The app loads it instead of the samples; set `PLUMBLINE_DATA=sample` to switch back.
+
+```bash
+.venv/bin/python -m scripts.scan_candidates
+```
+
+```bash
+.venv/bin/python -m app.real.fetch && .venv/bin/python -m app.real.build
+```
+
 Tests:
 
 ```bash
@@ -80,4 +90,4 @@ Production: `npm run build` in `frontend/`, then the backend serves `frontend/di
 | GET | `/api/data/vexcel/ortho.jpg` | `lat, lon, half_side_m, pixels` aerial image |
 | GET | `/api/data/vexcel/property` | `lat, lon` footprint, roof shape/material/condition, rooftop AC count |
 
-All buildings, parties and numbers are sample data.
+With the real data built, buildings and measurements are real (CoStar kit, Vexcel, Matterport); parties, bills, bank accounts and surcharge history are sample data. Without it, everything is sample data.
