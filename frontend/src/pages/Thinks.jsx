@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BUILDINGS, PARTIES } from "../data";
+import { BUILDINGS, PARTIES, partyOf } from "../data";
 import { Flag, Head, J, NEEDS, WHO } from "../lib";
 
 const STACK = [["Agent", "deepagents"], ["Data", "CoStar · Vexcel · Matterport"], ["History", "Tiger Data"], ["Hosting + GPU", "Vultr"], ["Money and rent math", "plain code, no AI"]];
@@ -64,7 +64,7 @@ export default function Thinks({ S, A }) {
           </div>
           <div className="tile">
             <div className="over">4 · Long-term memory</div>
-            <pre className="json" style={{ marginTop: 12 }}>{J({ party: PARTIES[c.party].name, note: PARTIES[c.party].memory, building: BUILDINGS[c.b].name, last_check: c.id })}</pre>
+            <pre className="json" style={{ marginTop: 12 }}>{J({ party: partyOf(c).name, note: partyOf(c).memory, building: BUILDINGS[c.b].name, last_check: c.id })}</pre>
           </div>
           <div className="tile">
             <div className="over">5 · Human in the loop</div>

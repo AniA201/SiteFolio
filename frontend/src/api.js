@@ -22,4 +22,12 @@ export const api = {
   decide: (id, action) => post(`/claims/${id}/decision`, { action }),
   ingest: sampleId => post("/claims/ingest", { sample_id: sampleId }),
   judge: bill => post("/judge", bill),
+  upload: async file => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/claims/upload", { method: "POST", body: form });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.detail || `Upload failed (${res.status})`);
+    return body;
+  },
 };

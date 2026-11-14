@@ -13,5 +13,8 @@ export async function loadMeta() {
   Object.assign(PARTIES, m.parties);
   Object.assign(PERSONAS, m.personas);
   SURCHARGES.push(...m.surcharges);
-  Object.assign(META, m.meta || {}, { real: !!m.real, matterport_sdk_key: m.matterport_sdk_key || null, public_url: m.public_url || null });
+  Object.assign(META, m.meta || {}, { real: !!m.real, matterport_sdk_key: m.matterport_sdk_key || null, public_url: m.public_url || null, has_ai_reader: !!m.has_ai_reader });
 }
+
+// A claim's party: from the reference list, or carried on the claim itself (bills uploaded from new vendors).
+export const partyOf = c => PARTIES[c.party] || c.party_info || { name: "Unknown sender", role: "Contractor", acct: "—", memory: "No history in our records." };

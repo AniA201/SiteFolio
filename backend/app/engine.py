@@ -37,6 +37,7 @@ class Engine:
         self.queue: list[str] = []
         self.current: str | None = None
         self.judge_n = 1
+        self.upload_n = 0
         self.rev = 0
 
     def find(self, cid: str) -> dict | None:
@@ -119,6 +120,17 @@ class Engine:
         self.queue.append(sample["id"])
         self._changed()
         return sample["id"]
+
+    def next_upload_id(self) -> str:
+        self.upload_n = getattr(self, "upload_n", 0) + 1
+        return f"UPL-{self.upload_n:03d}"
+
+    def add_claim(self, claim: dict) -> str:
+        """Add a claim built from an uploaded document and queue the agent on it."""
+        self.claims.insert(0, claim)
+        self.queue.append(claim["id"])
+        self._changed()
+        return claim["id"]
 
     def judge(self, area: int, amount: int, bank: str, hidden: str) -> str:
         claim = build_judge_claim(area, amount, bank, hidden, self.judge_n)

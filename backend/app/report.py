@@ -16,12 +16,16 @@ REVIEW = {"ok": "Approved", "sent": "Message sent", "rejected": "Rejected"}
 e = lambda x: html.escape(str(x))
 
 
+def party(c: dict) -> dict:
+    return PARTIES.get(c["party"]) or c.get("party_info") or {"name": "Unknown sender", "role": "Contractor"}
+
+
 def money(v) -> str:
     return f"${round(v):,}" if isinstance(v, (int, float)) else str(v)
 
 
 def decision_record(c: dict, review: str | None) -> dict:
-    o, B, p = c["outcome"], BUILDINGS[c["b"]], PARTIES[c["party"]]
+    o, B, p = c["outcome"], BUILDINGS[c["b"]], party(c)
     key = lambda s: s.lower().replace(" ", "_")
     return {"id": c["id"], "persona": c["persona"], "from": p["name"], "title": c["title"], "amount": c["amount"],
             "building": {"name": B["name"], "costar_id": B["cs"], "city": B["city"]},
@@ -62,7 +66,7 @@ def _aerial(B: dict) -> str:
 
 
 def render(c: dict, review: str | None, steps_done: int, audience: str = "full") -> str:
-    o, B, p = c["outcome"], BUILDINGS[c["b"]], PARTIES[c["party"]]
+    o, B, p = c["outcome"], BUILDINGS[c["b"]], party(c)
     head = f"<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Plumbline · {e(c['id'])}</title><style>{STYLE}</style></head><body><main>"
     toolbar = '<div class="toolbar"><button onclick="print()">Save as PDF</button></div>'
     data_note = ("Buildings and measurements come from CoStar, Vexcel and Matterport. Parties, bills and history in this demo are sample data."
