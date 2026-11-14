@@ -147,7 +147,7 @@ def owner_claims(v: Facts) -> list[dict]:
     # Roof replacement, area inflated.
     claim_area, rate = 52_000, 6.0
     amount = claim_area * rate
-    roof = money.check_roof(fp, 0, claim_area)
+    roof = money.check_roof(fp, 0, claim_area, shape=(v.vx.primary.roof_shape if v.vx.primary else None))
     split = money.pay_verified_share(amount, claim_area, roof.surface, roof.allowed)
     out.append({"id": "CLM-2207", "persona": "owner", "party": "lsr", "b": "vine", "date": "Nov 11", "title": "Roof replacement",
         "amount": amount, "kind": "roof", "claim": claim_area, "measured": round(fp),

@@ -39,12 +39,30 @@ class RoofCheck:
     formula: str        # shown on screen so judges can see the adjustment
 
 
-def check_roof(footprint_sqft: float, pitch_deg: float, claimed_sqft: float) -> RoofCheck:
+# Vexcel reports roof shape, not pitch. Pitched shapes use a standard 6/12 pitch (26.57°), labelled as an assumption.
+STANDARD_PITCH_DEG = 26.57
+
+
+def pitch_for_shape(shape: str | None) -> tuple[float, bool]:
+    """(pitch in degrees, whether it is assumed) for a Vexcel roof shape."""
+    s = (shape or "").lower()
+    if not s or s == "flat":
+        return 0.0, False
+    return STANDARD_PITCH_DEG, True  # any pitched shape (gable, hip, mansard, ...): pitch is assumed, not measured
+
+
+def check_roof(footprint_sqft: float, pitch_deg: float, claimed_sqft: float, shape: str | None = None) -> RoofCheck:
+    if shape is not None:
+        pitch_deg, assumed = pitch_for_shape(shape)
+    else:
+        assumed = False
     factor = slope_factor(pitch_deg)
     surface = footprint_sqft * factor
     allowance = FLAT_TOLERANCE if pitch_deg < 2 else SLOPED_WASTE
     allowed = surface * (1 + allowance)
-    formula = (f"{footprint_sqft:,.0f} sq ft footprint × {factor:.3f} slope factor ({pitch_deg:g}°)"
+    shape_note = f"{shape} roof, " if shape else ""
+    pitch_note = f"{shape_note}assumed 6/12 pitch" if assumed else f"{shape_note}{pitch_deg:g}°"
+    formula = (f"{footprint_sqft:,.0f} sq ft footprint × {factor:.3f} slope factor ({pitch_note})"
                f" = {surface:,.0f} sq ft; +{allowance:.0%} {'tolerance' if pitch_deg < 2 else 'waste'}"
                f" = {allowed:,.0f} sq ft allowed")
     return RoofCheck(footprint_sqft, pitch_deg, surface, allowed, claimed_sqft, claimed_sqft > allowed, formula)

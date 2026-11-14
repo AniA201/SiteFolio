@@ -118,6 +118,7 @@ function Detail({ A, id }) {
             Roof {v.roof_shape || "unknown"}{v.roof_material ? `, ${v.roof_material}` : ""} · footprint {sqft(v.footprint_sqft)}{v.structures > 1 ? ` (${v.structures} structures, ${sqft(v.total_footprint_sqft)} total)` : ""}<br />
             {v.ac_units} rooftop AC units · condition {v.roof_condition ?? "—"} · {v.collection}
             {b.roof_cross_check && <div className="receipt" style={{ background: "#fff" }}>CoStar floor plate {sqft(b.roof_cross_check.floor_plate_sqft)} vs Vexcel footprint {sqft(v.footprint_sqft)}: {b.roof_cross_check.agreement_pct <= 10 ? `agree within ${b.roof_cross_check.agreement_pct}%` : `differ by ${b.roof_cross_check.agreement_pct}% (setbacks, podium or several structures)`}</div>}
+            {b.roof_surface && <div className="receipt" style={{ background: "#fff" }}>{b.roof_surface.formula}</div>}
           </div>}
         </div>
         <div className="tile">

@@ -46,7 +46,8 @@ def check_vendor_account(vendor: str, pay_to_last4: str) -> str:
 def measure_roof(building: str) -> str:
     """Vexcel aerial survey of the building: roof footprint (sq ft), roof shape and material, and counted rooftop AC units."""
     b = _building(building)
-    return json.dumps({"footprint_sqft": b["roof"], "roof_shape": b.get("pitch"), "roof_material": b.get("roof_material"),
+    pitch, assumed = money.pitch_for_shape((b.get("pitch") or "flat").lower())
+    return json.dumps({"footprint_sqft": b["roof"], "roof_shape": b.get("pitch"), "pitch_deg": pitch, "pitch_assumed": assumed, "roof_material": b.get("roof_material"),
                        "rooftop_ac_units_top_down": b.get("ac"), "capture": b.get("vexcel_collection")})
 
 
