@@ -231,4 +231,5 @@ if DIST.exists():
 
     @app.get("/{path:path}")
     def spa(path: str):
-        return FileResponse(DIST / "index.html")
+        # Always revalidate the page itself, so a browser never keeps an old page that points at removed script files.
+        return FileResponse(DIST / "index.html", headers={"Cache-Control": "no-cache"})
