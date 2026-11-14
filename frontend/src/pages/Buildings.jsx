@@ -12,6 +12,25 @@ const TYPES = ["", "Multifamily", "Office", "Industrial", "GeneralRetail", "Flex
 const label = t => t ? t.replace(/([a-z])([A-Z])/g, "$1 $2") : "Any type";
 const getJSON = url => fetch(url).then(async r => { const b = await r.json().catch(() => ({})); if (!r.ok) throw new Error(b.detail || `HTTP ${r.status}`); return b; });
 
+function Coverage({ city }) {
+  const [cov, setCov] = useState(null);
+  useEffect(() => { getJSON("/api/kit/coverage").then(setCov).catch(() => setCov(null)); }, []);
+  const c = cov?.[city || "All"];
+  if (!c) return null;
+  const pct = n => `${Math.round(n / c.buildings * 100)}%`;
+  const tiles = [
+    ["All three layers", c.all_three_layers.toLocaleString(), `${pct(c.all_three_layers)} of ${c.buildings.toLocaleString()} buildings: CoStar record, Matterport scans, Vexcel aerial`],
+    ["3D scans", c.scans.toLocaleString(), `across ${c.with_scans.toLocaleString()} buildings`],
+    ["Asking rents", c.with_rents.toLocaleString(), "apartment communities on Apartments.com"],
+    ["Tenants and sales", `${c.with_tenants.toLocaleString()} · ${c.with_sales.toLocaleString()}`, "buildings with tenant records · with a recorded sale"],
+  ];
+  return (
+    <section className="grid g4" style={{ marginBottom: 18 }} aria-label="CoStar kit coverage">
+      {tiles.map(([l, v, d]) => <div className="tile" key={l}><div className="over">{l}</div><div className="stat num" style={{ fontSize: 34 }}>{v}</div><div className="muted small" style={{ marginTop: 8 }}>{d}</div></div>)}
+    </section>
+  );
+}
+
 function Search({ A }) {
   const [q, setQ] = useState("");
   const [city, setCity] = useState("");
@@ -28,6 +47,7 @@ function Search({ A }) {
   return (
     <div className="wrapx">
       <Head over="CoStar data kit" title="Buildings" lede={`Every building in the kit for Houston and Los Angeles${res.total ? ` (${res.total.toLocaleString()})` : ""}. Open one to see its record, what CoStar knows about it, the roof from above and its 3D scans.`} />
+      <Coverage city={city} />
       <div className="row wrap" style={{ gap: 10, marginBottom: 14 }}>
         <input id="kit-q" className="in" style={{ maxWidth: 380 }} placeholder="Search by name, address or CoStar id" value={q} onChange={e => setQ(e.target.value)} />
         <div className="tabs">{CITIES.map(([k, l]) => <button key={l} className={city === k ? "on" : ""} onClick={() => setCity(k)}>{l}</button>)}</div>
