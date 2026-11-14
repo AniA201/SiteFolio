@@ -20,7 +20,7 @@ eval $RSYNC \
   --exclude .claude --exclude .DS_Store --exclude '*.zip' \
   --exclude backend/app/data/agent_memory.json --exclude backend/app/data/solana \
   --exclude backend/app/data/models_index.csv --exclude backend/app/data/AGENTS.md \
-  --filter 'P frontend/dist/assets/*' \
+  --filter=\"P_frontend/dist/assets/**\" \
   ./ "root@$IP:/opt/plumbline/"
 # First deploy only: the agent's memory and the Solana wallet start as this laptop's copies, then live on the server.
 eval rsync -az --ignore-existing -e \"ssh -i $KEY\" backend/app/data/solana "root@$IP:/opt/plumbline/backend/app/data/" || true
