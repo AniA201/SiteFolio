@@ -13,5 +13,5 @@ export async function loadMeta() {
   Object.assign(PARTIES, m.parties);
   Object.assign(PERSONAS, m.personas);
   SURCHARGES.push(...m.surcharges);
-  Object.assign(META, m.meta || {}, { real: !!m.real, matterport_sdk_key: m.matterport_sdk_key || null });
+  Object.assign(META, m.meta || {}, { real: !!m.real, matterport_sdk_key: m.matterport_sdk_key || null, public_url: m.public_url || null });
 }
