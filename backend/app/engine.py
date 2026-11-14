@@ -40,7 +40,8 @@ class Engine:
         self.current: str | None = None
         self.judge_n = 1
         self.upload_n = 0
-        self.rev = 0
+        # Never go backwards: open pages ignore snapshots older than the last one they saw, so a reset keeps counting.
+        self.rev = getattr(self, "rev", 0) + 1
 
     def find(self, cid: str) -> dict | None:
         return next((c for c in self.claims if c["id"] == cid), None)
