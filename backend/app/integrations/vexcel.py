@@ -111,6 +111,7 @@ class PropertyFacts:
     collection: str | None
     inside_parcel: bool | None
     structures: list[Structure]
+    photo_date: str | None = None   # Vexcel's ortho date estimate (ISO date)
 
     @property
     def primary(self) -> Structure | None:
@@ -135,7 +136,8 @@ def parse_property(attrs: dict) -> PropertyFacts:
         ac_units=s.get("roof-objects.ac-unit.count"),
         building_type=s.get("building-type.class"),
     ) for s in attrs.get("structures") or []]
-    return PropertyFacts(attrs.get("metadata.collection"), attrs.get("request-information.inside-parcel"), structures)
+    return PropertyFacts(attrs.get("metadata.collection"), attrs.get("request-information.inside-parcel"), structures,
+                         (attrs.get("metadata.ortho-date-estimate") or "")[:10] or None)
 
 
 ORIENTED_COLLECTIONS_URL = f"{API}/oriented/collections"

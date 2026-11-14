@@ -15,6 +15,7 @@ import re
 from pathlib import Path
 
 from .. import money
+from ..freshness import AERIAL_STALE_DAYS, SCAN_STALE_DAYS, parse_date, scan_date, stamp
 from ..integrations.matterport import parse_rooms, total_sqft
 from ..integrations.vexcel import parse_property
 from .selection import SELECTION
@@ -79,7 +80,15 @@ class Facts:
                 "built": r["year_built"], "renovated": r["year_renovated"], "lat": r["lat"], "lon": r["lon"],
                 "units": r["units"], "parking_spaces": r["parking_spaces"], "vexcel_collection": self.vx.collection,
                 "matterport_models": [{"id": mid, "name": m["name"]} for mid, m in self.models.items()], "real": True,
-                "dossier": dossier_summary(self.dossier)}
+                "dossier": dossier_summary(self.dossier), "aerial_photo": self.aerial_stamp}
+
+    @property
+    def aerial_stamp(self) -> dict:
+        return stamp("Vexcel aerial", parse_date(self.vx.photo_date), AERIAL_STALE_DAYS)
+
+    def scan_stamp(self, mids: list[str]) -> dict:
+        dates = [d for d in (scan_date((self.models[m]["basics"].get("image") or {}).get("url")) for m in mids if m in self.models) if d]
+        return stamp("Matterport scan", max(dates) if dates else None, SCAN_STALE_DAYS)
 
     # ----- API call records, built from the real cached responses (trimmed) -----
     def call_costar(self) -> dict:
@@ -365,10 +374,36 @@ def stories(claims: dict, b: dict) -> dict:
     }
 
 
+AERIAL_KINDS = {"roof", "hvac", "rent", "rentdup"}  # a completed-roof draw is proven by any photo showing it done
+
+
+def add_freshness(c: dict, f: Facts) -> None:
+    """Attach the evidence dates and, where old data matters, add the agent's step for it (before the final math)."""
+    dates, notes = [], []
+    if any(a["svc"] == "Vexcel" for a in c["apis"]):
+        dates.append(f.aerial_stamp)
+        if c["kind"] in AERIAL_KINDS and f.aerial_stamp["stale"]:
+            notes.append(["coordinator", f"Aerial photo is from {f.aerial_stamp['label']}: it proves the size, not recent work. Ask for completion photos", "warn"])
+    mp = next((a for a in c["apis"] if a["svc"] == "Matterport"), None)
+    if mp:
+        resp = json.loads(mp["resp"])
+        mids = [m["model"] for m in (resp if isinstance(resp, list) else [resp])]
+        scan = f.scan_stamp(mids)
+        dates.append(scan)
+        if c["kind"] == "draw" and scan["stale"]:
+            notes.append(["coordinator", f"Plan updated: newest scan is from {scan['label']}; ask for a dated site photo of the finished units", "warn"])
+    c["data_dates"] = dates
+    if notes:
+        c["steps"][-1:-1] = notes
+
+
 def build() -> None:
     facts = {k: Facts(k) for k in SELECTION}
     buildings = {k: f.building() for k, f in facts.items()}
     claims = owner_claims(facts["vine"]) + reviewer_claims(facts["tamarind"], facts["westmoreland"]) + lender_claims(facts["lenox"])
+    for c in claims:
+        if c["b"] in facts:
+            add_freshness(c, facts[c["b"]])
     by_id = {c["id"]: c for c in claims}
     parties = json.loads((SAMPLE / "parties.json").read_text())
     parties["wcl"] = {"name": "Tamarind Apartments Owner LLC", "role": "Landlord", "acct": "—", "memory": "First application in our records."}

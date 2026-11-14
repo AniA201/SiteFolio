@@ -12,6 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 
 from .integrations.vexcel import VexcelClient, VexcelError
+from .freshness import AERIAL_STALE_DAYS, parse_date, stamp
 from .settings import settings
 
 router = APIRouter(prefix="/api/kit")
@@ -60,7 +61,8 @@ def vexcel_facts(lat: float, lon: float) -> dict | None:
     p = f.primary
     return {"footprint_sqft": round(p.footprint_sqft or 0), "total_footprint_sqft": round(f.total_footprint_sqft),
             "roof_shape": p.roof_shape, "roof_material": p.roof_material, "roof_condition": p.roof_condition,
-            "ac_units": f.total_ac_units, "structures": len(f.structures), "collection": f.collection}
+            "ac_units": f.total_ac_units, "structures": len(f.structures), "collection": f.collection,
+            "photo": stamp("Vexcel aerial", parse_date(f.photo_date), AERIAL_STALE_DAYS)}
 
 
 def roof_basis(v: dict, plate: float | None) -> tuple[int, str, int | None]:
