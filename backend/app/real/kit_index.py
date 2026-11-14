@@ -117,6 +117,37 @@ def build(kit: CostarKit) -> tuple[list[dict], dict[str, dict]]:
             entry |= {"asking_price_low": _num(sale.get("askingPriceLow")), "asking_price_high": _num(sale.get("askingPriceHigh"))}
         dossier[pid].setdefault("listings", []).append(entry)
     print(f"listings ({time.time() - t0:.0f}s)")
+
+    # Homes: MLS listings with Matterport scans (residential-listings), one entry per home.
+    for_sale = enums.get("ForSaleStatus", {})
+    txn = enums.get("TransactionType", {})
+    home_models: dict[str, list[str]] = defaultdict(list)
+    for row in kit.rows("residential-listings.csv"):
+        if row.get("matterportmodelid"):
+            home_models[row["listingid"]].append(row["matterportmodelid"])
+    seen = set()
+    for r in _jsonl(kit, "data/residential-listings.jsonl"):
+        prop = r.get("property") or {}
+        a = prop.get("address") or {}
+        home_key = r.get("residentialListingId") or r["id"]
+        if home_key in seen or not a.get("latitude"):
+            continue
+        seen.add(home_key)
+        street = " ".join(str(x) for x in (a.get("streetNumber"), a.get("streetDirection"), a.get("streetName"), a.get("streetType") or a.get("streetSuffix")) if x)
+        unit = a.get("unitNumber") or a.get("unit")
+        hid = f"home-{r['id']}"
+        structure = (r.get("resoValues") or {}).get("structure") or {}
+        index.append({"id": hid, "name": street + (f" #{unit}" if unit else ""), "address": street, "city": (a.get("city") or "").title(),
+                      "state": a.get("state") or "", "type": "Home", "status": "Existing", "gba_sqft": _num(prop.get("sqftMin")),
+                      "stories": structure.get("stories"), "units": None, "year_built": prop.get("yearBuilt"),
+                      "lat": a.get("latitude"), "lon": a.get("longitude"), "models": len(home_models.get(str(r["id"]), [])),
+                      "model_ids": home_models.get(str(r["id"]), [])})
+        dossier[hid]["home"] = {"price": _num(r.get("currentPrice")), "transaction": txn.get(str(r.get("transactionType")), "Unknown"),
+                                "status": for_sale.get(str(r.get("forSaleStatus")), "Unknown"), "listed": str(r.get("listDate") or "")[:10] or None,
+                                "beds": prop.get("bedsMax") or prop.get("bedsMin"), "baths": prop.get("bathsMax") or prop.get("bathsMin"),
+                                "living_sqft": _num(prop.get("sqftMin")), "lot_acres": _num(prop.get("lotSizeAcresMin")),
+                                "mls_type": prop.get("mlsPropertyType"), "subdivision": prop.get("subdivision"), "parking": prop.get("totalParkingSpaces")}
+    print(f"homes: {len(seen)} ({time.time() - t0:.0f}s)")
     return index, dict(dossier)
 
 

@@ -5,6 +5,11 @@ const words = s => s.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
 export default function Dossier({ d }) {
   if (!d || !Object.keys(d).length) return null;
   const rows = [];
+  if (d.home) {
+    const h = d.home;
+    rows.push(["Home listing", `${h.price ? usd(h.price) : "Price not given"} · ${words(h.status)}${h.listed ? ` · listed ${h.listed}` : ""}`,
+      [h.mls_type, h.subdivision, h.lot_acres ? `${h.lot_acres} acres` : null].filter(Boolean).join(" · ") || null]);
+  }
   if (d.apartments) {
     const a = d.apartments;
     const rent = a.min_rent && a.max_rent ? `${usd(a.min_rent)}–${usd(a.max_rent)} / mo · ${a.plans} floor plans` : `${a.plans} floor plans listed`;
