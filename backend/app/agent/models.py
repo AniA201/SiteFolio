@@ -1,8 +1,10 @@
-"""Free models for the deep agent: Groq's free tier first, Ollama on this machine when Groq can't answer.
+"""Models for the deep agent, tried in order for every call: AWS Bedrock, then Groq's free tier, then Ollama on this
+machine.
 
-Fallback happens per model call, not per run: if Groq rate-limits (its free tier allows 8,000 tokens a minute per
-model), times out, or returns a malformed tool call, that one step goes to Ollama and the run carries on. Nothing
-here costs money. Configure with PLUMBLINE_MODELS, e.g. "groq:openai/gpt-oss-120b,ollama:gpt-oss:20b".
+Bedrock (when AWS keys are set): Claude Sonnet coordinates and Claude Haiku runs the helper agents, with Amazon Nova
+as the Bedrock backup (Nova needs no extra AWS approval). Fallback happens per model call, not per run: if a model is
+throttled, not enabled for the account, times out, or returns a malformed tool call, that one step goes to the next
+model and the run carries on. Without AWS keys everything runs on the free models only.
 """
 from __future__ import annotations
 
@@ -34,6 +36,36 @@ ROLE_GROQ_MODEL = {
 }
 
 
+# AWS Bedrock: Claude for quality, Nova as the backup (no Anthropic use-case form needed). Override with env vars.
+ROLE_BEDROCK_MODEL = {
+    "coordinator": os.getenv("PLUMBLINE_BEDROCK_MODEL", "us.anthropic.claude-sonnet-4-6"),
+    "helper": os.getenv("PLUMBLINE_BEDROCK_HELPER", "us.anthropic.claude-haiku-4-5-20251001-v1:0"),
+}
+ROLE_BEDROCK_BACKUP = {
+    "coordinator": os.getenv("PLUMBLINE_BEDROCK_BACKUP", "us.amazon.nova-pro-v1:0"),
+    "helper": os.getenv("PLUMBLINE_BEDROCK_HELPER_BACKUP", "us.amazon.nova-lite-v1:0"),
+}
+BEDROCK_LABEL = {"claude-sonnet": "Claude Sonnet", "claude-haiku": "Claude Haiku", "nova-pro": "Nova Pro",
+                 "nova-lite": "Nova Lite", "nova-2-lite": "Nova 2 Lite"}
+
+
+def bedrock_ready() -> bool:
+    return bool(settings.aws_access_key_id) and os.getenv("PLUMBLINE_BEDROCK", "on") != "off"
+
+
+def _bedrock(model: str):
+    from botocore.config import Config
+    from langchain_aws import ChatBedrockConverse
+    return ChatBedrockConverse(model=model, region_name=settings.aws_region, temperature=0, max_tokens=4096,
+                               config=Config(retries={"max_attempts": 1, "mode": "standard"}, read_timeout=90, connect_timeout=10))
+
+
+def _bedrock_name(model: str) -> str:
+    label = next((v for k, v in BEDROCK_LABEL.items() if k in model), model)
+    version = re.search(r"(\d+-\d+)(?:-\d{8})?(?:-v\d)?(?::\d)?$", model)
+    return f"Bedrock {label}" + (f" {version.group(1).replace('-', '.')}" if version and "claude" in model else "")
+
+
 def ollama_ready(model: str = OLLAMA_MODEL) -> bool:
     try:
         tags = httpx.get(f"{OLLAMA_URL}/api/tags", timeout=2).json().get("models", [])
@@ -58,11 +90,20 @@ def _ollama(model: str = OLLAMA_MODEL, temperature: float = 0):
 _COOLDOWN: dict[str, float] = {}
 
 
+# Bedrock errors that won't fix themselves within a run (model not enabled, AWS form pending, account still verifying).
+_NOT_ENABLED = ("use case details", "not available for this account", "AccessDenied", "being verified", "Legacy",
+                "don't have access", "not authorized")
+
+
 def _cooldown_seconds(error: Exception) -> float:
-    m = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", str(error))
+    text = f"{type(error).__name__} {error}"
+    if any(k in text for k in _NOT_ENABLED):
+        return 15 * 60.0  # skip that model for a while instead of failing on every step
+    m = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", text)
     if m:
         return int(m.group(1) or 0) * 60 + float(m.group(2))
-    return 20.0 if "429" in str(error) or "rate limit" in str(error).lower() else 0.0
+    low = text.lower()
+    return 20.0 if "429" in text or "rate limit" in low or "throttl" in low or "too many requests" in low else 0.0
 
 
 class FreeChatModel(BaseChatModel):
@@ -76,7 +117,7 @@ class FreeChatModel(BaseChatModel):
 
     @property
     def _llm_type(self) -> str:
-        return "plumbline-free"
+        return "plumbline-chain"
 
     def bind_tools(self, tools, **kwargs):
         kwargs.pop("tool_choice", None)  # forced tool choice isn't supported everywhere; the prompt steers instead
@@ -107,11 +148,16 @@ class FreeChatModel(BaseChatModel):
             # Everyone failed this round: wait out the shortest rate-limit window and go again.
             pending = [t - time.time() for t in _COOLDOWN.values() if t > time.time()]
             time.sleep(min(min(pending, default=1.0), max_wait))
-        raise RuntimeError("All free models failed. " + " | ".join(errors[-4:]))
+        raise RuntimeError("All models failed. " + " | ".join(errors[-4:]))
 
 
 def free_model(role: str = "coordinator") -> FreeChatModel:
+    """The model chain for a role: Bedrock (if AWS keys are set), then the free models."""
     chain, names = [], []
+    if bedrock_ready():
+        kind = "coordinator" if role == "coordinator" else "helper"
+        for m in dict.fromkeys([ROLE_BEDROCK_MODEL[kind], ROLE_BEDROCK_BACKUP[kind]]):
+            chain.append(_bedrock(m)); names.append(_bedrock_name(m))
     if settings.groq_api_key:
         m = ROLE_GROQ_MODEL.get(role, ROLE_GROQ_MODEL["coordinator"])
         chain.append(_groq(m)); names.append(f"Groq {m}")
@@ -126,9 +172,9 @@ def free_model(role: str = "coordinator") -> FreeChatModel:
             if f"Groq {other}" not in names:
                 chain.append(_groq(other)); names.append(f"Groq {other}")
     if not chain:
-        raise RuntimeError("No free model available: set GROQ_API_KEY or start Ollama with " + OLLAMA_MODEL)
+        raise RuntimeError("No model available: set AWS keys for Bedrock, GROQ_API_KEY, or start Ollama with " + OLLAMA_MODEL)
     return FreeChatModel(chain=chain, names=names, retry=retry, served=[], patient=not local)
 
 
 def any_free_model() -> bool:
-    return bool(settings.groq_api_key) or ollama_ready()
+    return bedrock_ready() or bool(settings.groq_api_key) or ollama_ready()

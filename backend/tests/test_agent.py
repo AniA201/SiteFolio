@@ -208,3 +208,39 @@ def test_cloud_without_ollama_falls_back_across_free_groq_models(monkeypatch):
     monkeypatch.setattr(M, "settings", dataclasses.replace(M.settings, groq_api_key="test-key"))
     m = M.free_model("coordinator")
     assert m.patient and len(m.names) == len(set(M.ROLE_GROQ_MODEL.values())) and m.names[0].endswith(M.ROLE_GROQ_MODEL["coordinator"])
+
+
+def test_bedrock_comes_first_with_free_models_behind_it(monkeypatch):
+    import dataclasses
+
+    from app.agent import models as M
+    monkeypatch.setenv("PLUMBLINE_BEDROCK", "on")
+    monkeypatch.setattr(M, "ollama_ready", lambda: False)
+    monkeypatch.setattr(M, "settings", dataclasses.replace(M.settings, aws_access_key_id="AKIATEST", groq_api_key="test-key"))
+    coord, helper = M.free_model("coordinator"), M.free_model("roof")
+    assert coord.names[:2] == ["Bedrock Claude Sonnet 4.6", "Bedrock Nova Pro"] and any(n.startswith("Groq") for n in coord.names)
+    assert helper.names[:2] == ["Bedrock Claude Haiku 4.5", "Bedrock Nova Lite"]
+
+
+def test_a_model_the_account_cannot_use_is_skipped_for_a_while():
+    from app.agent.models import _cooldown_seconds
+    assert _cooldown_seconds(RuntimeError("Model use case details have not been submitted for this account")) >= 600
+    assert _cooldown_seconds(RuntimeError("ThrottlingException: Too many requests")) == 20.0
+
+
+def test_rules_deny_a_duplicate_rent_charge_the_agent_approved():
+    cid = next(c["id"] for c in CLAIMS if c["kind"] == "rentdup")
+    c, run, steps, out = run_scripted(cid, [
+        call("compute_rent_surcharge", {"cost": 90400, "units": 24}, 1),
+        call("record_decision", {"claim_id": cid, "status": "approved", "reason": "Looks fine."}, 2),
+    ])
+    assert out.get("overruled") and out["status"] == "denied"
+
+
+def test_rules_keep_the_rent_amount_when_the_agent_used_the_wrong_cost():
+    cid = next(c["id"] for c in CLAIMS if c["kind"] == "rent")
+    c, run, steps, out = run_scripted(cid, [
+        call("compute_rent_surcharge", {"cost": 1000, "units": 24}, 1),
+        call("record_decision", {"claim_id": cid, "status": "reduced", "reason": "Reduced."}, 2),
+    ])
+    assert out.get("overruled") and out["b"] == c["outcome"]["b"]

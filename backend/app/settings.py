@@ -28,6 +28,8 @@ class Settings:
     costar_zip_password: str | None = _get("COSTAR_ZIP_PASSWORD")
     anthropic_api_key: str | None = _get("ANTHROPIC_API_KEY")
     groq_api_key: str | None = _get("GROQ_API_KEY")
+    aws_access_key_id: str | None = _get("AWS_ACCESS_KEY_ID")  # AWS Bedrock models for the agent (boto3 reads the rest)
+    aws_region: str = _get("AWS_REGION") or "us-east-1"
     langsmith_api_key: str | None = _get("LANGSMITH_API_KEY")
     tiger_database_url: str | None = _get("TIGER_DATABASE_URL")
     public_url: str | None = _get("PUBLIC_URL")  # where phones reach the app, e.g. https://plumbline.us
@@ -52,6 +54,7 @@ class Settings:
             "costar": bool(self.costar_zip_password and (self.costar_kit_url or self.costar_kit_zip)),
             "ai_model": bool(self.anthropic_api_key),
             "groq": bool(self.groq_api_key),
+            "bedrock": bool(self.aws_access_key_id),
             "deep_agent": self.agent_enabled,
             "langsmith": bool(self.langsmith_api_key),
             "tiger": bool(self.tiger_database_url),

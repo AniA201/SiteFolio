@@ -212,6 +212,25 @@ KIND_STATUS = {"draw": DRAW_STATUS, "drawroof": DRAW_STATUS, "rent": {"reduced":
 BILL_STATUS = {"reduced": "partial", "denied": "blocked", "partial": "partial", "blocked": "blocked", "approved": "approved"}
 
 
+def _dollars(v) -> float | None:
+    try:
+        return float(str(v).replace("$", "").replace("/mo", "").replace(",", ""))
+    except ValueError:
+        return None
+
+
+def _active_surcharge(run: Run, claim: dict) -> bool:
+    """Plain-code registry lookup: the agent's own call if it made one, otherwise the rules check it themselves."""
+    seen = [c["result"] for c in run.calls if c["tool"] == "check_surcharge_history" and "error" not in c["result"]]
+    if any(r.get("active_surcharge") for r in seen):
+        return True
+    from . import tools as T
+    try:
+        return bool(json.loads(T.check_surcharge_history(claim["b"], claim.get("work") or "roof")).get("active_surcharge"))
+    except Exception:
+        return False
+
+
 def outcome_from(run: Run, claim: dict) -> dict:
     """The decision shown to the person: the agent's verdict and reason, amounts from the money tools only."""
     rec = claim["outcome"]
@@ -234,6 +253,15 @@ def outcome_from(run: Run, claim: dict) -> dict:
                                     "only a changed account blocks a bill. The rules' result stands."}
     if bills and bank_blocked and status != "blocked":
         return {**rec, "overruled": "The bank account isn't the approved one, so the bill is blocked whatever the agent proposed."}
+    if kind == "rentdup" and status != "denied" and _active_surcharge(run, claim):
+        return {**rec, "overruled": "The surcharge registry shows this work is already being charged to tenants, so a second "
+                                    "charge is denied whatever the agent proposed."}
+    if kind == "rent" and status not in ("denied",):
+        rents = [m["result"]["per_unit_per_month"] for m in run.money if m["tool"] == "compute_rent_surcharge"]
+        expect = _dollars(rec["b"][1])
+        if rents and expect and abs(min(rents) - expect) > max(0.5, 0.02 * expect):
+            return {**rec, "overruled": f"The agent's rent math used inputs that don't match the verified quantities "
+                                        f"(${min(rents):.2f} vs ${expect:.2f} a month), so the rules' amount stands."}
     if needs_math and status not in ("blocked", "denied") and not any(m["tool"] in (needs_math, "compute_verified_cost") for m in run.money):
         return {**rec, "overruled": "The agent decided without running the math tool, so the plain-code rules' amounts stand."}
     if kind in ("rent", "rentdup"):
