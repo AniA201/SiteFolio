@@ -17,7 +17,8 @@ export default function History({ S, A }) {
   }, [S.persona, S.log.length]);
   const ids = new Set(S.all.map(claim => claim.id));
   const events = history?.connected ? history.recent.map(event => ({
-    t: new Date(event.at).toLocaleString(),
+    t: new Date(event.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }),  // short: fits the time column
+    full: new Date(event.at).toLocaleString(),
     id: ids.has(event.claim_id) ? event.claim_id : null,
     text: `${event.claim_id} · ${event.detail?.text || event.kind.replaceAll("_", " ")}`,
     who: event.detail?.worker || "Tiger Cloud",
@@ -66,7 +67,7 @@ export default function History({ S, A }) {
           </tr>)}</tbody>
         </table></div> : <ul className="history-events">{rows.map((event, index) => (
           <li key={event.t + event.text + index}>
-            <time className="mono">{event.t}</time>
+            <time className="mono" title={event.full}>{event.t}</time>
             <div>{event.id ? <a href={`#/claim/${event.id}`}>{event.text.slice(event.id.length + 3)} <span aria-hidden="true">↗</span></a> : event.text}
               <small>{event.who}{event.id && " · " + event.id}</small></div>
             <span className={event.ok === "done" ? "muted" : "history-flag"}>{OUTCOMES[event.ok] ?? "Event"}</span>

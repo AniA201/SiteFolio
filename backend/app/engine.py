@@ -225,6 +225,8 @@ class Engine:
         self.log.insert(0, {"t": datetime.now().strftime("%H:%M:%S"), "who": WHO[step[0]], "text": f"{cid} · {step[1]}", "ok": step[2]})
         del self.log[LOG_LIMIT:]
         self.steps[cid] = len(claim["steps"])
+        if self.history:  # live agent steps go to the event history too, like replayed ones
+            self.history.record(cid, claim["persona"], "check_step", {"worker": WHO[step[0]], "text": step[1], "result": step[2], "live": True})
         self._changed()
 
     async def _run_with_agent(self, cid: str, claim: dict) -> bool:
@@ -261,6 +263,9 @@ class Engine:
         self._check_surcharge(cid, claim)
         self.steps[cid] = len(claim["steps"])
         self.status[cid] = claim["outcome"]["status"]
+        if self.history:
+            self.history.record(cid, claim["persona"], "check_completed", {"status": self.status[cid], "live": True,
+                                                                           "models": claim["agent"]["models"]})
         self.current = None
         self._changed()
         return True

@@ -123,6 +123,18 @@ Live check of the whole flow on devnet, with a test key standing in for Phantom:
 Evidence is sealed at approval, so notes the agent writes after it resumes never break Verify; an edited evidence file does.
 Approved decisions can't be undone in Review once they're on Solana, and the exported report and `decision.json` carry the receipt.
 
+## Tiger Data history
+Set `TIGER_DATABASE_URL` (a Tiger Cloud connection string) in `backend/.env`. On start the app creates:
+- `history_events`, a **hypertable** of every check step, decision and amount paid or held, with **columnar
+  compression** for events older than a week;
+- `history_weekly`, a **continuous aggregate** of events, paid and held per week and user type (History page chart,
+  with the dashboard's query time shown);
+- `surcharge_registry`, seeded with the city's active surcharges; a rent increase for work that is already being
+  charged is **denied** (the double-charge check);
+- `claim_state`, so claims and decisions survive a restart.
+Writes go through one background thread and one connection, so checks never wait on the database. Tests against a real
+TimescaleDB: `TIGER_TEST_URL=postgresql://... pytest tests/test_tiger.py` (see the file for a local Docker command).
+
 ## Deploy on Vultr
 The app runs on a Vultr Cloud Compute server (Ubuntu 24.04, 2 vCPU / 4 GB, New Jersey) behind Caddy, which serves
 HTTPS automatically and asks for a site password. Live demo: https://66-135-21-65.sslip.io (user `plumbline`, password
