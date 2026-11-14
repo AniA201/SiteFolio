@@ -17,14 +17,17 @@ from .engine import Engine
 from .fixtures import BUILDINGS, PARTIES, PERSONAS, SURCHARGES
 from .routes_data import router as data_router
 from .settings import settings
+from .tiger import TigerHistory
 
 engine: Engine
+tiger = TigerHistory()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     global engine
     engine = Engine()
+    tiger.initialize()
     engine.start()
     yield
     await engine.stop()
@@ -75,6 +78,11 @@ def state():
     return engine.snapshot()
 
 
+@app.get("/api/history/{persona}")
+def history(persona: Literal["owner", "reviewer", "lender"]):
+    return tiger.dashboard(persona)
+
+
 @app.get("/api/stream")
 async def stream(request: Request):
     """Server-sent events: one full state snapshot per change."""
@@ -108,13 +116,15 @@ def ingest(body: Ingest):
     cid = engine.ingest(body.sample_id)
     if not cid:
         raise HTTPException(404, "Sample already used or unknown")
+    tiger.record(cid, _claim_or_404(cid)["persona"], "document_ingested")
     return {"id": cid, "state": engine.snapshot()}
 
 
 @app.post("/api/claims/{cid}/run")
 def run(cid: str):
-    _claim_or_404(cid)
+    claim = _claim_or_404(cid)
     engine.run(cid)
+    tiger.record(cid, claim["persona"], "check_started")
     return engine.snapshot()
 
 
@@ -134,14 +144,16 @@ def retry(cid: str):
 
 @app.post("/api/claims/{cid}/decision")
 def decision(cid: str, body: Decision):
-    _claim_or_404(cid)
+    claim = _claim_or_404(cid)
     engine.decide(cid, body.action)
+    tiger.record(cid, claim["persona"], "decision", {"action": body.action})
     return engine.snapshot()
 
 
 @app.post("/api/judge")
 def judge(body: JudgeBill):
     cid = engine.judge(body.area, body.amount, body.bank, body.hidden)
+    tiger.record(cid, "owner", "document_ingested")
     return {"id": cid, "state": engine.snapshot()}
 
 
