@@ -27,6 +27,7 @@ class Settings:
     costar_kit_zip: str | None = _get("COSTAR_KIT_ZIP")
     costar_zip_password: str | None = _get("COSTAR_ZIP_PASSWORD")
     anthropic_api_key: str | None = _get("ANTHROPIC_API_KEY")
+    groq_api_key: str | None = _get("GROQ_API_KEY")
     langsmith_api_key: str | None = _get("LANGSMITH_API_KEY")
     tiger_database_url: str | None = _get("TIGER_DATABASE_URL")
     public_url: str | None = _get("PUBLIC_URL")  # where phones reach the app, e.g. https://plumbline.us
@@ -34,8 +35,12 @@ class Settings:
 
     @property
     def agent_enabled(self) -> bool:
-        """Run the real deep agent (needs an AI key). PLUMBLINE_AGENT=replay forces the recorded plans."""
-        return bool(self.anthropic_api_key) and os.getenv("PLUMBLINE_AGENT", "deep") != "replay"
+        """Run the real deep agent on a free model (Groq free tier or local Ollama). PLUMBLINE_AGENT=replay forces the
+        recorded plans. Checked per run, so starting Ollama later switches the agent on without a restart."""
+        if os.getenv("PLUMBLINE_AGENT", "deep") == "replay":
+            return False
+        from .agent.models import any_free_model
+        return any_free_model()
 
     def integrations(self) -> dict[str, bool]:
         """Which outside services are configured. Safe to expose: booleans only."""
@@ -46,6 +51,7 @@ class Settings:
             "vexcel": bool(self.vexcel_api_key),
             "costar": bool(self.costar_zip_password and (self.costar_kit_url or self.costar_kit_zip)),
             "ai_model": bool(self.anthropic_api_key),
+            "groq": bool(self.groq_api_key),
             "deep_agent": self.agent_enabled,
             "langsmith": bool(self.langsmith_api_key),
             "tiger": bool(self.tiger_database_url),

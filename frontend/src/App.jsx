@@ -52,7 +52,7 @@ export default function App() {
     upload: (file, buildingId) => api.upload(file, buildingId).then(r => { apply(r.state); setPersona("owner"); go("claim", r.id); return r; }),
     judgeHere: bill => api.judge(bill).then(r => { apply(r.state); return r.id; }),
   };
-  const S = { persona, list, all, samples: state.samples, steps: state.steps, status: state.status, running, current: state.current, review: state.review, retry: state.retry, log: state.log };
+  const S = { persona, list, all, samples: state.samples, memory: state.agent_memory, steps: state.steps, status: state.status, running, current: state.current, review: state.review, retry: state.retry, log: state.log };
 
   const { page, id } = route, active = PARENT[page] || page;
   const reviewCount = list.filter(c => NEEDS.includes(state.status[c.id]) && !state.review[c.id]).length;

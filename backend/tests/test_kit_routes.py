@@ -16,3 +16,14 @@ def test_search_ranks_and_filters(monkeypatch):
     assert [h["id"] for h in routes_kit.search("tamarind", scanned=True)] == ["1"]
     assert [h["id"] for h in routes_kit.search("", city="Houston")] == ["3"]
     assert routes_kit.search("nothing matches this") == []
+
+
+def test_coverage_counts(monkeypatch):
+    index = [{"id": "1", "city": "Houston", "models": 2, "lat": 1, "lon": 1, "gba_sqft": 10},
+             {"id": "2", "city": "Los Angeles", "models": 0, "lat": 1, "lon": 1, "gba_sqft": 10}]
+    monkeypatch.setattr(routes_kit, "kit", lambda: (index, {"1": {"apartments": {}, "tenants": {"count": 1}}}))
+    routes_kit.coverage.cache_clear()
+    c = routes_kit.coverage()
+    assert c["All"]["buildings"] == 2 and c["All"]["all_three_layers"] == 1 and c["Houston"]["scans"] == 2
+    assert c["Houston"]["with_tenants"] == 1 and c["Los Angeles"]["with_scans"] == 0
+    routes_kit.coverage.cache_clear()

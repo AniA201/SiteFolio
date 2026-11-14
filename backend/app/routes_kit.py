@@ -12,6 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 
 from .integrations.vexcel import VexcelClient, VexcelError
+from .freshness import AERIAL_STALE_DAYS, parse_date, stamp
 from .settings import settings
 
 router = APIRouter(prefix="/api/kit")
@@ -60,7 +61,8 @@ def vexcel_facts(lat: float, lon: float) -> dict | None:
     p = f.primary
     return {"footprint_sqft": round(p.footprint_sqft or 0), "total_footprint_sqft": round(f.total_footprint_sqft),
             "roof_shape": p.roof_shape, "roof_material": p.roof_material, "roof_condition": p.roof_condition,
-            "ac_units": f.total_ac_units, "structures": len(f.structures), "collection": f.collection}
+            "ac_units": f.total_ac_units, "structures": len(f.structures), "collection": f.collection,
+            "photo": stamp("Vexcel aerial", parse_date(f.photo_date), AERIAL_STALE_DAYS)}
 
 
 def roof_basis(v: dict, plate: float | None) -> tuple[int, str, int | None]:
@@ -73,6 +75,36 @@ def roof_basis(v: dict, plate: float | None) -> tuple[int, str, int | None]:
         return options[0][0], options[0][1], None
     sqft, basis = min(options, key=lambda o: abs(o[0] / plate - 1))
     return sqft, basis, round(abs(sqft / plate - 1) * 100)
+
+
+@lru_cache(maxsize=1)
+def coverage() -> dict:
+    """How much of the kit each layer covers: what can be checked from data, by city."""
+    index, dossiers = kit()
+    out = {}
+    for city in ("Houston", "Los Angeles", None):
+        rows = [b for b in index if city is None or b["city"] == city]
+        d = [dossiers.get(b["id"], {}) for b in rows]
+        out[city or "All"] = {
+            "buildings": len(rows),
+            "with_location": sum(1 for b in rows if b.get("lat") and b.get("lon")),
+            "with_scans": sum(1 for b in rows if b["models"]),
+            "scans": sum(b["models"] for b in rows),
+            "with_rents": sum(1 for x in d if x.get("apartments")),
+            "with_tenants": sum(1 for x in d if x.get("tenants")),
+            "with_sales": sum(1 for x in d if x.get("last_sale")),
+            "with_listings": sum(1 for x in d if x.get("listings")),
+            "all_three_layers": sum(1 for b in rows if b["models"] and b.get("lat") and b.get("gba_sqft")),
+            "homes": sum(1 for b in rows if b.get("type") == "Home"),
+        }
+    return out
+
+
+@router.get("/coverage")
+def coverage_route():
+    if not kit()[0]:
+        raise HTTPException(503, "The CoStar kit index isn't built yet. Run: python -m app.real.kit_index")
+    return coverage()
 
 
 @router.get("/search")

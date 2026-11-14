@@ -48,3 +48,11 @@ def test_report_escapes_judge_text():
         cid = client.post("/api/judge", json={"area": 9000, "amount": 1000, "bank": "4421", "hidden": "<script>alert(1)</script>"}).json()["id"]
         run_to_end(client, cid)
         assert "<script>alert(1)</script>" not in client.get(f"/api/claims/{cid}/report").text
+
+
+def test_reset_keeps_the_state_version_moving_forward():
+    with TestClient(app) as client:
+        before = client.get("/api/state").json()["rev"]
+        client.post("/api/claims/CLM-2207/run")
+        after_reset = client.post("/api/reset").json()["rev"]
+        assert after_reset > before

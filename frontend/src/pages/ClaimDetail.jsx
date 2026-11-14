@@ -4,6 +4,7 @@ import { COL, Check, Flag, J, LAYER, SvcChip, Tag, WHO, aerialKind, fmt, isLayer
 import { Aerial, FloorPlan } from "../components/Illustrations";
 import MatterportTour, { toursFromCall } from "../components/MatterportTour";
 import Dossier from "../components/Dossier";
+import DataAge from "../components/DataAge";
 
 const TABS = [["run", "Agent run"], ["apis", "Building data calls"], ["cross", "Cross-checks"], ["evidence", "Evidence"]];
 const MEASURED_KINDS = ["roof", "rent", "rentdup", "parking"];
@@ -127,6 +128,7 @@ function RunTab({ S, A, c, step, done, mine, reached, setTab }) {
             </>}
             {c.roof_formula && reached(vi) && <div className="receipt" style={{ background: "var(--surface)" }}>{c.roof_formula}</div>}
             <div className="muted small" style={{ marginTop: 10 }}>{B.real ? `Vexcel ortho, ${B.vexcel_collection} · roof ${B.pitch.toLowerCase()}${B.roof_material ? ", " + B.roof_material : ""} · ${B.ac} rooftop units counted` : "Illustration · roof outline measured on a Vultr GPU"}</div>
+            {B.real && <DataAge stamp={(c.data_dates || []).find(d => d.source === "Vexcel aerial") || B.aerial_photo} />}
           </div>
         )}
         {mi >= 0 && (
@@ -135,6 +137,7 @@ function RunTab({ S, A, c, step, done, mine, reached, setTab }) {
             {tours.length > 0 ? <>
               <MatterportTour tours={tours} show={reached(mi)} />
               <div className="muted small" style={{ marginTop: 10 }}>Live Matterport tour of the scanned space. Room areas come from the Model API.</div>
+              <DataAge verb="Newest scan photographed" stamp={(c.data_dates || []).find(d => d.source === "Matterport scan")} />
             </> : <>
               <div className="ph" style={{ marginTop: 14, position: "relative" }}>
                 <FloorPlan show={reached(mi)} mode={c.persona === "reviewer" ? "apt" : c.persona === "lender" ? "units" : null} />
@@ -218,8 +221,12 @@ function EvidenceTab({ S, c, step, done }) {
       <div className="tile">
         <h4>Evidence folder</h4>
         <div className="term" style={{ marginTop: 14 }}>
-          <div><b>/evidence/{c.id.toLowerCase()}/</b></div>
-          {files.map(f => <div key={f}>  {done ? "" : <span className="g">(pending) </span>}{f}</div>)}
+          {c.evidence_files ? Object.keys(c.evidence_files).sort().map(f => (
+            <details key={f}><summary style={{ cursor: "pointer" }}>{f}</summary><pre style={{ whiteSpace: "pre-wrap", margin: "4px 0 8px", color: "rgba(255,255,255,.75)" }}>{c.evidence_files[f]}</pre></details>
+          )) : <>
+            <div><b>/evidence/{c.id.toLowerCase()}/</b></div>
+            {files.map(f => <div key={f}>  {done ? "" : <span className="g">(pending) </span>}{f}</div>)}
+          </>}
         </div>
         <h4 style={{ marginTop: 18 }}>Audit log</h4>
         <div className="term" style={{ marginTop: 10 }}>
@@ -253,7 +260,7 @@ export default function ClaimDetail({ S, A, id }) {
         <div className="row between" style={{ alignItems: "flex-end", marginTop: 10 }}>
           <div>
             <h1 className="h1">{c.title}</h1>
-            <div className="row wrap" style={{ marginTop: 14 }}><Tag s={st} /><span className="muted">{p.name} ({p.role.toLowerCase()}) · {B.name}, {B.city} · <b style={{ color: "var(--ink)" }}>{fmt(c.amount)}</b></span></div>
+            <div className="row wrap" style={{ marginTop: 14 }}><Tag s={st} />{c.agent?.live && <span className="tag t-running" title={Object.keys(c.agent.models || {}).join(", ")}>Live agent · free models</span>}<span className="muted">{p.name} ({p.role.toLowerCase()}) · {B.name}, {B.city} · <b style={{ color: "var(--ink)" }}>{fmt(c.amount)}</b></span></div>
           </div>
           <div className="row">
             <button className="btn gray" disabled={mine} onClick={() => A.reset(c.id)}>Reset</button>

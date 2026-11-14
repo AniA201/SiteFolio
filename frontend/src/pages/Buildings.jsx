@@ -3,13 +3,33 @@
 import { useEffect, useRef, useState } from "react";
 import { Flag, Head, SvcChip, sqft } from "../lib";
 import Dossier from "../components/Dossier";
+import DataAge from "../components/DataAge";
 import MatterportTour from "../components/MatterportTour";
 import { RealAerial } from "./ClaimDetail";
 
 const CITIES = [["", "All"], ["Houston", "Houston"], ["Los Angeles", "Los Angeles"]];
-const TYPES = ["", "Multifamily", "Office", "Industrial", "GeneralRetail", "Flex", "Hospitality"];
+const TYPES = ["", "Home", "Multifamily", "Office", "Industrial", "GeneralRetail", "Flex", "Hospitality"];
 const label = t => t ? t.replace(/([a-z])([A-Z])/g, "$1 $2") : "Any type";
 const getJSON = url => fetch(url).then(async r => { const b = await r.json().catch(() => ({})); if (!r.ok) throw new Error(b.detail || `HTTP ${r.status}`); return b; });
+
+function Coverage({ city }) {
+  const [cov, setCov] = useState(null);
+  useEffect(() => { getJSON("/api/kit/coverage").then(setCov).catch(() => setCov(null)); }, []);
+  const c = cov?.[city || "All"];
+  if (!c) return null;
+  const pct = n => `${Math.round(n / c.buildings * 100)}%`;
+  const tiles = [
+    ["All three layers", c.all_three_layers.toLocaleString(), `${pct(c.all_three_layers)} of ${c.buildings.toLocaleString()} properties: CoStar record, Matterport scans, Vexcel aerial`],
+    ["3D scans", c.scans.toLocaleString(), `across ${c.with_scans.toLocaleString()} properties${c.homes ? `, incl. ${c.homes.toLocaleString()} homes` : ""}`],
+    ["Asking rents", c.with_rents.toLocaleString(), "apartment communities on Apartments.com"],
+    ["Tenants and sales", `${c.with_tenants.toLocaleString()} · ${c.with_sales.toLocaleString()}`, "buildings with tenant records · with a recorded sale"],
+  ];
+  return (
+    <section className="grid g4" style={{ marginBottom: 18 }} aria-label="CoStar kit coverage">
+      {tiles.map(([l, v, d]) => <div className="tile" key={l}><div className="over">{l}</div><div className="stat num" style={{ fontSize: 34 }}>{v}</div><div className="muted small" style={{ marginTop: 8 }}>{d}</div></div>)}
+    </section>
+  );
+}
 
 function Search({ A }) {
   const [q, setQ] = useState("");
@@ -27,6 +47,7 @@ function Search({ A }) {
   return (
     <div className="wrapx">
       <Head over="CoStar data kit" title="Buildings" lede={`Every building in the kit for Houston and Los Angeles${res.total ? ` (${res.total.toLocaleString()})` : ""}. Open one to see its record, what CoStar knows about it, the roof from above and its 3D scans.`} />
+      <Coverage city={city} />
       <div className="row wrap" style={{ gap: 10, marginBottom: 14 }}>
         <input id="kit-q" className="in" style={{ maxWidth: 380 }} placeholder="Search by name, address or CoStar id" value={q} onChange={e => setQ(e.target.value)} />
         <div className="tabs">{CITIES.map(([k, l]) => <button key={l} className={city === k ? "on" : ""} onClick={() => setCity(k)}>{l}</button>)}</div>
@@ -59,13 +80,13 @@ function Search({ A }) {
   );
 }
 
-function Scans({ ids }) {
+function Scans({ ids, listedSqft }) {
   const [models, setModels] = useState(ids.slice(0, 12).map(id => ({ id, name: id })));
   const [tour, setTour] = useState(null);
   const [error, setError] = useState("");
   useEffect(() => {
     ids.slice(0, 12).forEach((id, i) => getJSON(`/api/data/matterport/models/${id}`)
-      .then(m => setModels(ms => ms.map((x, k) => k === i ? { id, name: m.name || id } : x))).catch(() => {}));
+      .then(m => setModels(ms => ms.map((x, k) => k === i ? { id, name: m.name || id, photo: m.scan_photo } : x))).catch(() => {}));
   }, [ids.join(",")]);
   const open = m => {
     setError("");
@@ -80,6 +101,10 @@ function Scans({ ids }) {
         {models.map(m => <button key={m.id} className={"btn sm " + (tour?.model === m.id ? "black" : "gray")} style={{ height: 32, padding: "0 12px", fontSize: 12.5 }} onClick={() => open(m)}>{m.name.length > 26 ? m.name.slice(0, 25) + "…" : m.name}</button>)}
       </div>
       {error && <p className="small" style={{ color: "var(--red)" }}>{error}</p>}
+      {tour && <DataAge verb="Scan photographed" staleNote="over 90 days old" stamp={models.find(m => m.id === tour.model)?.photo} />}
+      {tour && listedSqft && tour.total_sq_ft > 0 && <div className="receipt" style={{ background: "var(--surface)" }}>
+        MLS listing (CoStar): {sqft(listedSqft)} living area · Matterport measured {sqft(Math.round(tour.total_sq_ft))}: {Math.abs(tour.total_sq_ft / listedSqft - 1) <= 0.15 ? `agree within ${Math.round(Math.abs(tour.total_sq_ft / listedSqft - 1) * 100)}%` : `differ by ${Math.round(Math.abs(tour.total_sq_ft / listedSqft - 1) * 100)}% (scans often skip garages, patios or closed rooms)`}
+      </div>}
       {tour ? <MatterportTour key={tour.model} tours={[tour]} show /> : <p className="muted small" style={{ marginTop: 10 }}>Pick a scan to measure its rooms and walk the 3D tour.</p>}
     </div>
   );
@@ -117,7 +142,8 @@ function Detail({ A, id }) {
         <div className="tile">
           <div className="row between"><h4>Building record</h4><SvcChip s="CoStar" /></div>
           <div className="row wrap" style={{ gap: 26, marginTop: 14 }}>
-            {[["Size", b.gba_sqft ? sqft(Math.round(b.gba_sqft)) : "—"], ["Floors", b.stories || "—"], ...(b.units ? [["Units", b.units]] : []), ["Built", b.year_built || "—"]].map(([l, x]) =>
+            {(d.home ? [["Living area", b.gba_sqft ? sqft(Math.round(b.gba_sqft)) : "—"], ["Beds", d.home.beds ?? "—"], ["Baths", d.home.baths ?? "—"], ["Built", b.year_built || "—"]]
+              : [["Size", b.gba_sqft ? sqft(Math.round(b.gba_sqft)) : "—"], ["Floors", b.stories || "—"], ...(b.units ? [["Units", b.units]] : []), ["Built", b.year_built || "—"]]).map(([l, x]) =>
               <div key={l}><div className="muted small">{l}</div><div style={{ fontWeight: 600 }}>{x}</div></div>)}
           </div>
           <Dossier d={{ ...d, ...(apt && { apartments: { ...apt, plans: apt.plans.length } }), ...(ten && { tenants: { count: ten.count, occupied_sqft: ten.occupied_sqft, top: ten.list.slice(0, 5) } }) }} />
@@ -128,13 +154,14 @@ function Detail({ A, id }) {
           {v && <div className="small" style={{ marginTop: 10, lineHeight: 1.7 }}>
             Roof {v.roof_shape || "unknown"}{v.roof_material ? `, ${v.roof_material}` : ""} · footprint {sqft(v.footprint_sqft)}{v.structures > 1 ? ` (${v.structures} structures, ${sqft(v.total_footprint_sqft)} total)` : ""}<br />
             {v.ac_units} rooftop AC units · condition {v.roof_condition ?? "—"} · {v.collection}
+            <DataAge stamp={v.photo} staleNote="over a year old" />
             {b.roof_cross_check && <div className="receipt" style={{ background: "#fff" }}>CoStar floor plate {sqft(b.roof_cross_check.floor_plate_sqft)} vs Vexcel roof {sqft(b.roof_cross_check.roof_sqft)} ({b.roof_cross_check.basis}): {b.roof_cross_check.agreement_pct <= 15 ? `agree within ${b.roof_cross_check.agreement_pct}%` : `differ by ${b.roof_cross_check.agreement_pct}%, so roof claims here go to a person`}</div>}
             {b.roof_surface && <div className="receipt" style={{ background: "#fff" }}>{b.roof_surface.formula}</div>}
           </div>}
         </div>
         <div className="tile">
           <div className="row between"><h4>Inside · 3D scans</h4><SvcChip s="Matterport" /></div>
-          {b.model_ids.length ? <Scans ids={b.model_ids} /> : <p className="muted small">No Matterport scans for this building.</p>}
+          {b.model_ids.length ? <Scans ids={b.model_ids} listedSqft={d.home?.living_sqft} /> : <p className="muted small">No Matterport scans for this building.</p>}
         </div>
       </section>
       {apt && apt.plans.length > 0 && (
