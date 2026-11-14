@@ -11,6 +11,7 @@ import Tenant from "./pages/Tenant";
 import History from "./pages/History";
 import Thinks from "./pages/Thinks";
 import Fool from "./pages/Fool";
+import FoolPhone from "./pages/FoolPhone";
 
 const NAV = [["overview", "Overview"], ["claims", "Claims"], ["review", "Review"], ["tenant", "Tenant view"], ["history", "History"], ["thinks", "How it thinks"]];
 const PARENT = { claim: "claims" };
@@ -45,6 +46,7 @@ export default function App() {
     decide: (id, action) => api.decide(id, action).then(apply),
     ingest: sampleId => api.ingest(sampleId).then(r => { apply(r.state); go("claim", r.id); }),
     judge: bill => api.judge(bill).then(r => { apply(r.state); setPersona("owner"); go("claim", r.id); }),
+    judgeHere: bill => api.judge(bill).then(r => { apply(r.state); return r.id; }),
   };
   const S = { persona, list, all, samples: state.samples, steps: state.steps, status: state.status, running, current: state.current, review: state.review, retry: state.retry, log: state.log };
 
@@ -61,6 +63,8 @@ export default function App() {
     thinks: <Thinks key={persona} {...P} />,
     fool: <Fool {...P} />,
   }[page] || <Overview {...P} />;
+
+  if (page === "fool-it") return state.rev >= 0 ? <FoolPhone {...P} /> : null;
 
   return (
     <div>

@@ -29,6 +29,7 @@ class Settings:
     anthropic_api_key: str | None = _get("ANTHROPIC_API_KEY")
     langsmith_api_key: str | None = _get("LANGSMITH_API_KEY")
     tiger_database_url: str | None = _get("TIGER_DATABASE_URL")
+    public_url: str | None = _get("PUBLIC_URL")  # where phones reach the app, e.g. https://plumbline.us
     models_index_csv: Path = Path(_get("MODELS_INDEX_CSV") or BACKEND_DIR / "app" / "data" / "models_index.csv")
 
     def integrations(self) -> dict[str, bool]:
