@@ -34,7 +34,7 @@ cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cd backend && .venv/bin/uvicorn app.main:app --reload --port 8787
 ```
 
-Keys: copy `backend/.env.example` to `backend/.env` and fill it in. `GET /api/health` shows which integrations are configured. Check them from `backend/`:
+Keys: from `backend/`, run `.venv/bin/python setup_keys.py`. It asks for each key and file, saves them to `backend/.env` (gitignored), copies `models_index.csv` into place and tests every connection. You can also copy `backend/.env.example` to `backend/.env` by hand. `GET /api/health` shows which integrations are configured. Check them from `backend/`:
 
 ```bash
 .venv/bin/python -m app.integrations.matterport
