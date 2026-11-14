@@ -82,7 +82,7 @@ def _claim_or_404(cid: str) -> dict:
 # ---------- read ----------
 @app.get("/api/health")
 def health():
-    return {"ok": True, "integrations": settings.integrations()}
+    return {"ok": True, "integrations": {**settings.integrations(), "tiger": tiger.enabled}}
 
 
 @app.get("/api/meta")
