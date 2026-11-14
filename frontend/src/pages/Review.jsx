@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BUILDINGS, PARTIES } from "../data";
+import { BUILDINGS, PARTIES, partyOf } from "../data";
 import { COL, Head, NEEDS, Tag, money } from "../lib";
 
 const APPROVE_LABEL = {
@@ -29,7 +29,7 @@ export default function Review({ S, A }) {
             {cases.map(c => (
               <div key={c.id} onClick={() => setSel(c.id)} style={{ padding: "16px 18px", borderTop: "1px solid var(--g2)", cursor: "pointer", background: c.id === cur.id ? "var(--g1)" : "#fff" }}>
                 <div className="row between"><span className="mono small muted">{c.id}</span><Tag s={S.review[c.id] || S.status[c.id]} /></div>
-                <div style={{ fontWeight: 600, marginTop: 6 }}>{PARTIES[c.party].name}</div>
+                <div style={{ fontWeight: 600, marginTop: 6 }}>{partyOf(c).name}</div>
                 <div className="row between"><span className="small muted">{c.title}</span><span className="num" style={{ fontWeight: 700, color: COL[c.outcome.b[2]] }}>{money(c.outcome.b[1])}</span></div>
               </div>
             ))}

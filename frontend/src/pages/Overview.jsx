@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { META, PARTIES, PERSONAS } from "../data";
+import { META, PARTIES, PERSONAS, partyOf } from "../data";
 import { COL, FINAL, NEEDS, SvcChip, Tag, fmt, money, sumNum } from "../lib";
 import { Aerial, FloorPlan } from "../components/Illustrations";
 
@@ -100,7 +100,7 @@ export default function Overview({ S, A }) {
             <div key={c.id} className="row" style={{ padding: "16px 0", borderTop: "1px solid var(--g2)", marginTop: 12, cursor: "pointer" }} onClick={() => A.go("claim", c.id)}>
               <Tag s={status[c.id]} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600 }}>{PARTIES[c.party].name} · {c.title}</div>
+                <div style={{ fontWeight: 600 }}>{partyOf(c).name} · {c.title}</div>
                 <div className="muted small">{c.outcome.reason.split(". ")[0]}.</div>
               </div>
               <div className="num" style={{ fontWeight: 600, fontSize: 18, color: COL[c.outcome.b[2]] }}>{money(c.outcome.b[1])}</div>

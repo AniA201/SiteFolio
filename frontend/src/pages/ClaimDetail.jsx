@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BUILDINGS, PARTIES, PERSONAS } from "../data";
+import { BUILDINGS, PARTIES, PERSONAS, partyOf } from "../data";
 import { COL, Check, Flag, J, LAYER, SvcChip, Tag, WHO, aerialKind, fmt, isLayer, money, sqft } from "../lib";
 import { Aerial, FloorPlan } from "../components/Illustrations";
 import MatterportTour, { toursFromCall } from "../components/MatterportTour";
@@ -43,7 +43,7 @@ function RulesBox({ c, done }) {
       </div>
     </div>
   );
-  const p = PARTIES[c.party], badBank = c.bank && c.bank !== p.acct;
+  const p = partyOf(c), badBank = c.bank && c.bank !== p.acct;
   const checks = [["Approved contractor", true], ["Account matches " + p.acct, !badBank], ["Amount at or below verified", true], ["Not paid before", true]];
   return (
     <div className="tile">
@@ -203,7 +203,7 @@ function CrossTab({ c, done }) {
 }
 
 function EvidenceTab({ S, c, step, done }) {
-  const o = c.outcome, B = BUILDINGS[c.b], p = PARTIES[c.party];
+  const o = c.outcome, B = BUILDINGS[c.b], p = partyOf(c);
   const files = ["document.json", "plan.md", ...c.apis.filter(a => a.svc !== "AI model").map(a => fileName(a.svc)), "cross_checks.json", "decision.md"];
   const record = {
     id: c.id, persona: c.persona, from: p.name, building: { name: B.name, costar_id: B.cs },
@@ -241,7 +241,7 @@ export default function ClaimDetail({ S, A, id }) {
   const [tab, setTab] = useState("run");
   if (!c) return null;
   const step = S.steps[c.id] ?? -1, st = S.status[c.id] || "ready", done = step >= c.steps.length, mine = S.current === c.id;
-  const B = BUILDINGS[c.b], p = PARTIES[c.party];
+  const B = BUILDINGS[c.b], p = partyOf(c);
   const reached = i => done || c.steps.some((s, k) => s[3] === i && k < step);
   const ctx = { S, A, c, step, done, mine, reached, setTab };
   return (

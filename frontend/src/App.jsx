@@ -46,6 +46,7 @@ export default function App() {
     decide: (id, action) => api.decide(id, action).then(apply),
     ingest: sampleId => api.ingest(sampleId).then(r => { apply(r.state); go("claim", r.id); }),
     judge: bill => api.judge(bill).then(r => { apply(r.state); setPersona("owner"); go("claim", r.id); }),
+    upload: file => api.upload(file).then(r => { apply(r.state); setPersona("owner"); go("claim", r.id); return r; }),
     judgeHere: bill => api.judge(bill).then(r => { apply(r.state); return r.id; }),
   };
   const S = { persona, list, all, samples: state.samples, steps: state.steps, status: state.status, running, current: state.current, review: state.review, retry: state.retry, log: state.log };
