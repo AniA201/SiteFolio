@@ -4,6 +4,7 @@ import { COL, Check, Flag, J, LAYER, SvcChip, Tag, WHO, aerialKind, fmt, isLayer
 import { Aerial, FloorPlan } from "../components/Illustrations";
 import MatterportTour, { toursFromCall } from "../components/MatterportTour";
 import Dossier from "../components/Dossier";
+import DataAge from "../components/DataAge";
 
 const TABS = [["run", "Agent run"], ["apis", "Building data calls"], ["cross", "Cross-checks"], ["evidence", "Evidence"]];
 const MEASURED_KINDS = ["roof", "rent", "rentdup", "parking"];
@@ -127,6 +128,7 @@ function RunTab({ S, A, c, step, done, mine, reached, setTab }) {
             </>}
             {c.roof_formula && reached(vi) && <div className="receipt" style={{ background: "var(--surface)" }}>{c.roof_formula}</div>}
             <div className="muted small" style={{ marginTop: 10 }}>{B.real ? `Vexcel ortho, ${B.vexcel_collection} · roof ${B.pitch.toLowerCase()}${B.roof_material ? ", " + B.roof_material : ""} · ${B.ac} rooftop units counted` : "Illustration · roof outline measured on a Vultr GPU"}</div>
+            {B.real && <DataAge stamp={(c.data_dates || []).find(d => d.source === "Vexcel aerial") || B.aerial_photo} />}
           </div>
         )}
         {mi >= 0 && (
@@ -135,6 +137,7 @@ function RunTab({ S, A, c, step, done, mine, reached, setTab }) {
             {tours.length > 0 ? <>
               <MatterportTour tours={tours} show={reached(mi)} />
               <div className="muted small" style={{ marginTop: 10 }}>Live Matterport tour of the scanned space. Room areas come from the Model API.</div>
+              <DataAge verb="Newest scan photographed" stamp={(c.data_dates || []).find(d => d.source === "Matterport scan")} />
             </> : <>
               <div className="ph" style={{ marginTop: 14, position: "relative" }}>
                 <FloorPlan show={reached(mi)} mode={c.persona === "reviewer" ? "apt" : c.persona === "lender" ? "units" : null} />

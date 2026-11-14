@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Flag, Head, SvcChip, sqft } from "../lib";
 import Dossier from "../components/Dossier";
+import DataAge from "../components/DataAge";
 import MatterportTour from "../components/MatterportTour";
 import { RealAerial } from "./ClaimDetail";
 
@@ -65,7 +66,7 @@ function Scans({ ids }) {
   const [error, setError] = useState("");
   useEffect(() => {
     ids.slice(0, 12).forEach((id, i) => getJSON(`/api/data/matterport/models/${id}`)
-      .then(m => setModels(ms => ms.map((x, k) => k === i ? { id, name: m.name || id } : x))).catch(() => {}));
+      .then(m => setModels(ms => ms.map((x, k) => k === i ? { id, name: m.name || id, photo: m.scan_photo } : x))).catch(() => {}));
   }, [ids.join(",")]);
   const open = m => {
     setError("");
@@ -80,6 +81,7 @@ function Scans({ ids }) {
         {models.map(m => <button key={m.id} className={"btn sm " + (tour?.model === m.id ? "black" : "gray")} style={{ height: 32, padding: "0 12px", fontSize: 12.5 }} onClick={() => open(m)}>{m.name.length > 26 ? m.name.slice(0, 25) + "…" : m.name}</button>)}
       </div>
       {error && <p className="small" style={{ color: "var(--red)" }}>{error}</p>}
+      {tour && <DataAge verb="Scan photographed" staleNote="over 90 days old" stamp={models.find(m => m.id === tour.model)?.photo} />}
       {tour ? <MatterportTour key={tour.model} tours={[tour]} show /> : <p className="muted small" style={{ marginTop: 10 }}>Pick a scan to measure its rooms and walk the 3D tour.</p>}
     </div>
   );
@@ -128,6 +130,7 @@ function Detail({ A, id }) {
           {v && <div className="small" style={{ marginTop: 10, lineHeight: 1.7 }}>
             Roof {v.roof_shape || "unknown"}{v.roof_material ? `, ${v.roof_material}` : ""} · footprint {sqft(v.footprint_sqft)}{v.structures > 1 ? ` (${v.structures} structures, ${sqft(v.total_footprint_sqft)} total)` : ""}<br />
             {v.ac_units} rooftop AC units · condition {v.roof_condition ?? "—"} · {v.collection}
+            <DataAge stamp={v.photo} staleNote="over a year old" />
             {b.roof_cross_check && <div className="receipt" style={{ background: "#fff" }}>CoStar floor plate {sqft(b.roof_cross_check.floor_plate_sqft)} vs Vexcel roof {sqft(b.roof_cross_check.roof_sqft)} ({b.roof_cross_check.basis}): {b.roof_cross_check.agreement_pct <= 15 ? `agree within ${b.roof_cross_check.agreement_pct}%` : `differ by ${b.roof_cross_check.agreement_pct}%, so roof claims here go to a person`}</div>}
             {b.roof_surface && <div className="receipt" style={{ background: "#fff" }}>{b.roof_surface.formula}</div>}
           </div>}

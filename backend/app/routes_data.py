@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Query, Response
 
 from .integrations.matterport import MatterportClient, MatterportError, ModelIndex, total_sqft
 from .integrations.vexcel import VexcelClient, VexcelError
+from .freshness import SCAN_STALE_DAYS, scan_date, stamp
 from .settings import settings
 
 router = APIRouter(prefix="/api/data")
@@ -39,7 +40,9 @@ def models_near(lat: float, lon: float, radius_m: float = Query(150, gt=0, le=50
 
 @router.get("/matterport/models/{model_id}")
 def model_basics(model_id: str):
-    return _call(_matterport().basics, model_id)
+    m = _call(_matterport().basics, model_id)
+    d = scan_date((m.get("image") or {}).get("url"))
+    return {**m, "scan_photo": stamp("Matterport scan", d, SCAN_STALE_DAYS)}
 
 
 @router.get("/matterport/models/{model_id}/rooms")
