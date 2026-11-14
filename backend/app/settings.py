@@ -32,6 +32,11 @@ class Settings:
     public_url: str | None = _get("PUBLIC_URL")  # where phones reach the app, e.g. https://plumbline.us
     models_index_csv: Path = Path(_get("MODELS_INDEX_CSV") or BACKEND_DIR / "app" / "data" / "models_index.csv")
 
+    @property
+    def agent_enabled(self) -> bool:
+        """Run the real deep agent (needs an AI key). PLUMBLINE_AGENT=replay forces the recorded plans."""
+        return bool(self.anthropic_api_key) and os.getenv("PLUMBLINE_AGENT", "deep") != "replay"
+
     def integrations(self) -> dict[str, bool]:
         """Which outside services are configured. Safe to expose: booleans only."""
         return {
@@ -41,9 +46,15 @@ class Settings:
             "vexcel": bool(self.vexcel_api_key),
             "costar": bool(self.costar_zip_password and (self.costar_kit_url or self.costar_kit_zip)),
             "ai_model": bool(self.anthropic_api_key),
+            "deep_agent": self.agent_enabled,
             "langsmith": bool(self.langsmith_api_key),
             "tiger": bool(self.tiger_database_url),
         }
 
 
 settings = Settings()
+
+# LangSmith traces every deep-agent run when a key is set (LangChain reads these variables).
+if settings.langsmith_api_key:
+    os.environ.setdefault("LANGSMITH_TRACING", "true")
+    os.environ.setdefault("LANGSMITH_PROJECT", "plumbline")
