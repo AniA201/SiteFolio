@@ -172,6 +172,71 @@ def match_building(text: str) -> str | None:
     return best if score >= 0.5 else None
 
 
+# Buildings added at run time from the CoStar kit (uploads and the Buildings page). Sent to the browser in snapshots.
+EXTRA_BUILDINGS: dict[str, dict] = {}
+
+
+def match_kit_building(text: str) -> str | None:
+    """Best CoStar kit property for an address, by street number and name tokens. Returns the kit property id."""
+    from .routes_kit import kit
+    want = _tokens(text)
+    nums = set(re.findall(r"\b\d{2,6}\b", text))
+    best, score = None, 0.0
+    for b in kit()[0]:
+        have = _tokens(f"{b['name']} {b['address']}")
+        if not have or (nums and not nums & set(re.findall(r"\b\d{2,6}\b", b["address"] or ""))):
+            continue
+        s = len(want & have) / len(have)
+        if s > score:
+            best, score = b["id"], s
+    return best if score >= 0.6 else None
+
+
+def load_kit_building(pid: str) -> str:
+    """Register a CoStar kit property as a checkable building, with live Vexcel roof facts. Returns its key."""
+    from .real.build import dossier_summary
+    from .routes_kit import find, kit, vexcel_facts
+    key = f"kit-{pid}"
+    if key in BUILDINGS:
+        return key
+    b = find(pid)
+    if not b:
+        raise IntakeError(f"No building {pid} in the CoStar kit.")
+    v = None
+    if b.get("lat") and settings.vexcel_api_key:
+        try:
+            v = vexcel_facts(round(b["lat"], 6), round(b["lon"], 6))
+        except Exception:
+            v = None
+    from .routes_kit import roof_basis
+    plate = b["gba_sqft"] / b["stories"] if b.get("gba_sqft") and b.get("stories") else None
+    roof_sqft, roof_on, roof_diff = (roof_basis(v, plate) if v else (0, None, None))
+    building = {"id": key, "cs": b["id"], "roof_basis": roof_on, "roof_agreement_pct": roof_diff, "name": b["name"], "city": f"{b['city']}, {b['state']}", "address": b["address"],
+                "type": b["type"], "size": round(b["gba_sqft"] or 0), "floors": b["stories"], "units": b["units"], "built": b["year_built"],
+                "lat": b["lat"], "lon": b["lon"], "roof": roof_sqft or 0, "ac": (v or {}).get("ac_units") or 0,
+                "pitch": ((v or {}).get("roof_shape") or "unknown").title(), "roof_material": (v or {}).get("roof_material"),
+                "roof_condition": (v or {}).get("roof_condition"), "vexcel_collection": (v or {}).get("collection"),
+                "matterport_models": [{"id": m, "name": m} for m in b.get("model_ids") or []], "real": True,
+                "dossier": dossier_summary(kit()[1].get(b["id"], {})), "from_kit": True, "vexcel": v}
+    BUILDINGS[key] = building
+    EXTRA_BUILDINGS[key] = building
+    return key
+
+
+def _kit_calls(B: dict) -> list[dict]:
+    """CoStar and Vexcel call records for a building loaded from the kit at run time."""
+    rec = {"property_id": B["cs"], "name": B["name"], "address": f"{B['address']}, {B['city']}", "property_type": B["type"],
+           "gross_building_area_sf": B["size"], "stories": B["floors"], **({"units": B["units"]} if B.get("units") else {}),
+           "year_built": B["built"], "lat": B["lat"], "lon": B["lon"]}
+    calls = [{"svc": "CoStar", "who": "records", "title": "Get the building record",
+              "req": f"CoStar data kit\n  data/commercial-property.jsonl\n  where id = {B['cs']}", "resp": json.dumps(rec, indent=2)}]
+    if B.get("vexcel"):
+        calls.append({"svc": "Vexcel", "who": "roof", "title": "Look from above",
+                      "req": f"GET /v2/property/extract\n  ?wkt=POINT({B['lon']} {B['lat']})\n  &srid=4326&latest=true\n  &include=precomputed\n  &unit-system=imperial",
+                      "resp": json.dumps(B["vexcel"], indent=2)})
+    return calls
+
+
 def match_party(vendor: str) -> str | None:
     v = _tokens(vendor)
     for key, p in PARTIES.items():
@@ -184,6 +249,8 @@ def match_party(vendor: str) -> str | None:
 # ---------- building the check ----------
 def _template_calls(b: str) -> list[dict]:
     """The recorded CoStar and Vexcel calls for this building, reused so every check shows real responses."""
+    if BUILDINGS.get(b, {}).get("from_kit"):
+        return _kit_calls(BUILDINGS[b])
     calls = {}
     for c in CLAIMS:
         if c["b"] == b:
@@ -193,8 +260,10 @@ def _template_calls(b: str) -> list[dict]:
     return [calls[s] for s in ("CoStar", "Vexcel") if s in calls]
 
 
-def build_claim(x: Extracted, filename: str, cid: str) -> dict:
-    b = match_building(f"{x.building_address} {x.work}")
+def build_claim(x: Extracted, filename: str, cid: str, building_key: str | None = None) -> dict:
+    b = building_key or match_building(f"{x.building_address} {x.work}")
+    if not b and (pid := match_kit_building(x.building_address)):
+        b = load_kit_building(pid)
     if not b:
         raise IntakeError(f"Couldn't match \"{x.building_address or 'the address'}\" to a building in the data set.")
     B = BUILDINGS[b]
@@ -217,13 +286,15 @@ def build_claim(x: Extracted, filename: str, cid: str) -> dict:
     if "CoStar" in idx:
         steps.append(["records", "Get the building record", "done", idx["CoStar"]])
 
-    verified, claimed, label, unit = None, x.quantity, None, x.unit or ""
+    verified, claimed, label, unit, formula = None, x.quantity, None, x.unit or "", None
     if x.kind == "roof" and claimed and "Vexcel" in idx:
         roof = money.check_roof(B["roof"], 0, claimed, shape=(B.get("pitch") or "flat").lower())
         split = money.pay_verified_share(amount, claimed, roof.surface, roof.allowed)
-        verified, label, unit = B["roof"], "Roof area", "sq ft"
+        verified, label, unit, formula = B["roof"], "Roof area", "sq ft", roof.formula
         steps += [["roof", "Measure the roof from above", "done", idx["Vexcel"]],
                   ["roof", f"Compare: {n0(claimed)} sq ft claimed vs {n0(verified)} measured", "fail" if roof.inflated else "done"]]
+        if (B.get("roof_agreement_pct") or 0) > 15:
+            steps.append(["coordinator", f"CoStar and Vexcel disagree on the roof by {B['roof_agreement_pct']}%: flag for a person", "warn"])
     elif x.kind == "rooftop_units" and claimed and "Vexcel" in idx and B.get("ac"):
         verified, label, unit = B["ac"], "Rooftop units", "units"
         split = money.pay_verified_share(amount, claimed, verified)
@@ -239,6 +310,11 @@ def build_claim(x: Extracted, filename: str, cid: str) -> dict:
         reason = ("The bill asks to pay an account that isn't on file for this vendor. Nothing is paid until the account is verified by phone."
                   if approved else f"{x.vendor} isn't an approved contractor, so nothing is paid until someone adds and verifies them.")
         steps.append(["rules", "Refuse payment, open review", "fail"])
+    elif x.kind == "roof" and verified is not None and (B.get("roof_agreement_pct") or 0) > 15:
+        status, a, bb = "partial", ["Pay now", 0, "gray"], ["Hold", amount, "amber"]
+        reason = (f"CoStar's floor plate and Vexcel's roof differ by {B['roof_agreement_pct']}% at {B['name']}, so the roof area can't be "
+                  "verified from data alone. Nothing is paid until a person confirms it.")
+        steps.append(["rules", f"Hold ${n0(amount)} until a person confirms the roof area", "warn"])
     elif split.hold:
         status, a, bb = "partial", ["Pay now", split.pay, "green"], ["Hold", split.hold, "amber"]
         reason = f"The bill claims {n0(claimed)} {unit} but the building shows {n0(verified)}. The verified share is paid and the rest is held."
@@ -255,14 +331,15 @@ def build_claim(x: Extracted, filename: str, cid: str) -> dict:
     cross = []
     if verified is not None:
         cross.append([label, f"CoStar: {B['name']}, {n0(B['size'])} sq ft over {B['floors']} floors",
-                      f"Vexcel: {n0(verified)} {unit}", f"Bill: {n0(claimed)} {unit}", "Bill is too big." if split.hold else "Matches."])
+                      f"Vexcel: {n0(verified)} {unit}" + (f" ({B['roof_basis']})" if B.get("roof_basis") and x.kind == "roof" else ""), f"Bill: {n0(claimed)} {unit}", ("Bill is too big." if split.hold else "Matches.")
+                      + (f" CoStar and Vexcel differ by {B['roof_agreement_pct']}%, so a person should confirm the roof area." if x.kind == "roof" and (B.get("roof_agreement_pct") or 0) > 15 else "")])
     cross.append(["Bank", f"Vendor file: {approved or 'none'}", "Phone-verified account only", f"Bill: {pay_to}",
                   "Not the approved account." if checks.blocked else "Matches."])
     return {
         "id": cid, "persona": "owner", "party": pkey or f"upload-{cid.lower()}", "b": b, "date": "Now",
         "party_info": None if pkey else {"name": x.vendor, "role": "Contractor", "acct": "—", "memory": "First bill in our records."},
         "title": x.work[:48], "amount": amount, "kind": {"rooftop_units": "hvac", "roof": "roof"}.get(x.kind, "other"),
-        "claim": claimed, "measured": verified, "bank": pay_to, "uploaded": filename, "reader": x.reader,
+        "claim": claimed, "measured": verified, "bank": pay_to, "roof_formula": formula, "uploaded": filename, "reader": x.reader,
         "apis": api, "steps": steps, "cross": cross, "lines": lines,
         "outcome": {"status": status, "a": a, "b": bb, "reason": reason,
                     "injected": "; ".join(x.suspicious_instructions) or None,

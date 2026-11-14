@@ -1,6 +1,6 @@
 // Every building in the CoStar kit: search, then open one to see its record, what the kit knows about it, the roof
 // from above (Vexcel, live) and its Matterport scans with the 3D tour.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Flag, Head, SvcChip, sqft } from "../lib";
 import Dossier from "../components/Dossier";
 import MatterportTour from "../components/MatterportTour";
@@ -88,7 +88,14 @@ function Scans({ ids }) {
 function Detail({ A, id }) {
   const [b, setB] = useState(null);
   const [error, setError] = useState("");
+  const [upload, setUpload] = useState({ busy: false, error: "" });
+  const picker = useRef(null);
   useEffect(() => { getJSON(`/api/kit/buildings/${id}`).then(setB).catch(e => setError(e.message)); }, [id]);
+  const send = file => {
+    if (!file) return;
+    setUpload({ busy: true, error: "" });
+    A.upload(file, id).catch(e => setUpload({ busy: false, error: e.message }));
+  };
   if (error) return <div className="wrapx"><Head over="CoStar data kit" title="Building not found" lede={error} right={<button className="btn gray" onClick={() => A.go("buildings")}>Back to search</button>} /></div>;
   if (!b) return <div className="wrapx"><Head over="CoStar data kit" title="Loading…" /></div>;
   const v = b.vexcel, d = b.dossier || {}, apt = d.apartments, ten = d.tenants;
@@ -99,7 +106,11 @@ function Detail({ A, id }) {
         <div className="over"><a onClick={() => A.go("buildings")}>Buildings</a> / CoStar {b.id}</div>
         <div className="row between wrap" style={{ alignItems: "flex-end", marginTop: 10 }}>
           <div><h1 className="h1">{b.name}</h1><div className="muted" style={{ marginTop: 10 }}>{b.address}, {b.city}, {b.state} · {label(b.type)}{b.status !== "Existing" ? ` · ${b.status}` : ""}</div></div>
-          <button className="btn black" onClick={() => A.go("claims")}>Check a bill for this building</button>
+          <div style={{ textAlign: "right" }}>
+            <input ref={picker} type="file" accept=".pdf,.txt,.eml,.md" hidden onChange={e => { send(e.target.files?.[0]); e.target.value = ""; }} />
+            <button className="btn black" disabled={upload.busy} onClick={() => picker.current?.click()}>{upload.busy ? "Reading the bill…" : "Check a bill for this building"}</button>
+            {upload.error && <div className="small" style={{ color: "var(--red)", marginTop: 8, maxWidth: 360 }}>{upload.error}</div>}
+          </div>
         </div>
       </div>
       <section className="grid g3" style={{ alignItems: "start" }}>
@@ -117,7 +128,7 @@ function Detail({ A, id }) {
           {v && <div className="small" style={{ marginTop: 10, lineHeight: 1.7 }}>
             Roof {v.roof_shape || "unknown"}{v.roof_material ? `, ${v.roof_material}` : ""} · footprint {sqft(v.footprint_sqft)}{v.structures > 1 ? ` (${v.structures} structures, ${sqft(v.total_footprint_sqft)} total)` : ""}<br />
             {v.ac_units} rooftop AC units · condition {v.roof_condition ?? "—"} · {v.collection}
-            {b.roof_cross_check && <div className="receipt" style={{ background: "#fff" }}>CoStar floor plate {sqft(b.roof_cross_check.floor_plate_sqft)} vs Vexcel footprint {sqft(v.footprint_sqft)}: {b.roof_cross_check.agreement_pct <= 10 ? `agree within ${b.roof_cross_check.agreement_pct}%` : `differ by ${b.roof_cross_check.agreement_pct}% (setbacks, podium or several structures)`}</div>}
+            {b.roof_cross_check && <div className="receipt" style={{ background: "#fff" }}>CoStar floor plate {sqft(b.roof_cross_check.floor_plate_sqft)} vs Vexcel roof {sqft(b.roof_cross_check.roof_sqft)} ({b.roof_cross_check.basis}): {b.roof_cross_check.agreement_pct <= 15 ? `agree within ${b.roof_cross_check.agreement_pct}%` : `differ by ${b.roof_cross_check.agreement_pct}%, so roof claims here go to a person`}</div>}
             {b.roof_surface && <div className="receipt" style={{ background: "#fff" }}>{b.roof_surface.formula}</div>}
           </div>}
         </div>

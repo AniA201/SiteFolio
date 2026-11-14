@@ -90,3 +90,30 @@ def test_claude_reader_request_shape(monkeypatch):
     assert sent["output_config"]["format"]["type"] == "json_schema"
     assert sent["messages"][0]["content"][0]["source"]["media_type"] == "application/pdf"
     assert "untrusted" in sent["system"]
+
+
+def test_bill_for_any_kit_building_is_matched_and_checked(monkeypatch):
+    from app import routes_kit
+    index = [{"id": "4526546", "name": "Ashford Lakes", "address": "12900 Ashford Point Dr", "city": "Houston", "state": "TX",
+              "type": "Multifamily", "status": "Existing", "gba_sqft": 190732.0, "stories": 3, "units": 185, "year_built": 1982,
+              "lat": 29.72, "lon": -95.6, "models": 0, "model_ids": []}]
+    monkeypatch.setattr(routes_kit, "kit", lambda: (index, {}))
+    monkeypatch.setattr(routes_kit, "vexcel_facts", lambda lat, lon: {"footprint_sqft": 10000, "total_footprint_sqft": 10000, "roof_shape": "gable",
+                                                                     "roof_material": "shingle", "roof_condition": 3.1, "ac_units": 0,
+                                                                     "structures": 1, "collection": "us-tx-houston-2025"})
+    monkeypatch.setattr(intake.settings.__class__, "vexcel_api_key", "k", raising=False)
+    bill = "Lone Star Roofing\nProperty: Ashford Lakes, 12900 Ashford Point Dr, Houston TX\nRoof replacement: 16,000 sq ft\nTotal due: $96,000\nPay to account ending in 4421\n"
+    c = intake.build_claim(intake.read_with_rules(bill), "ashford.txt", "UPL-009")
+    assert c["b"] == "kit-4526546" and intake.EXTRA_BUILDINGS["kit-4526546"]["pitch"] == "Gable"
+    # 10,000 sq ft gable footprint -> 11,180 sq ft surface (assumed 6/12), +15% waste = 12,857 allowed; 16,000 billed is inflated
+    # CoStar's floor plate (63,577) and Vexcel (10,000) disagree, so nothing is paid until a person confirms the roof
+    assert c["outcome"]["status"] == "partial" and c["outcome"]["a"][1] == 0 and "gable roof, assumed 6/12 pitch" in c["roof_formula"]
+    assert [a["svc"] for a in c["apis"]] == ["AI model", "CoStar", "Vexcel"]
+
+
+def test_disagreeing_sources_hold_everything_for_a_person(monkeypatch):
+    bill = intake.read_with_rules(ROOF_BILL.replace("14,500", "9,000"))
+    monkeypatch.setitem(intake.BUILDINGS["wc"], "roof_agreement_pct", 58)
+    c = intake.build_claim(bill, "bill.txt", "UPL-010")
+    assert c["outcome"]["status"] == "partial" and c["outcome"]["a"][1] == 0 and c["outcome"]["b"][1] == 87000
+    assert any("disagree" in s[1] for s in c["steps"])

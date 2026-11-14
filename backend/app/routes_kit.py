@@ -63,6 +63,18 @@ def vexcel_facts(lat: float, lon: float) -> dict | None:
             "ac_units": f.total_ac_units, "structures": len(f.structures), "collection": f.collection}
 
 
+def roof_basis(v: dict, plate: float | None) -> tuple[int, str, int | None]:
+    """Which Vexcel figure is the property's roof: the primary structure or every structure together, whichever agrees
+    with CoStar's floor plate (gross area / floors). Returns (sq ft, basis, % difference from the floor plate)."""
+    options = [(v["footprint_sqft"], "main building")]
+    if v.get("structures", 1) > 1 and v.get("total_footprint_sqft"):
+        options.append((v["total_footprint_sqft"], f"all {v['structures']} structures"))
+    if not plate:
+        return options[0][0], options[0][1], None
+    sqft, basis = min(options, key=lambda o: abs(o[0] / plate - 1))
+    return sqft, basis, round(abs(sqft / plate - 1) * 100)
+
+
 @router.get("/search")
 def search_route(q: str = "", city: str | None = None, type: str | None = None, scanned: bool = False, limit: int = Query(25, ge=1, le=100)):
     if not kit()[0]:
@@ -81,11 +93,12 @@ def building(pid: str):
             out["vexcel"] = vexcel_facts(round(b["lat"], 6), round(b["lon"], 6))
         except VexcelError as e:
             out["vexcel_error"] = str(e)
-    if out["vexcel"] and b.get("gba_sqft") and b.get("stories"):
-        plate = b["gba_sqft"] / b["stories"]
-        out["roof_cross_check"] = {"floor_plate_sqft": round(plate), "agreement_pct": round(abs(out["vexcel"]["footprint_sqft"] / plate - 1) * 100)}
     if out["vexcel"]:
         from .money import check_roof
-        r = check_roof(out["vexcel"]["footprint_sqft"], 0, 0, shape=out["vexcel"]["roof_shape"] or "flat")
+        plate = b["gba_sqft"] / b["stories"] if b.get("gba_sqft") and b.get("stories") else None
+        sqft, basis, diff = roof_basis(out["vexcel"], plate)
+        if plate:
+            out["roof_cross_check"] = {"floor_plate_sqft": round(plate), "roof_sqft": sqft, "basis": basis, "agreement_pct": diff}
+        r = check_roof(sqft, 0, 0, shape=out["vexcel"]["roof_shape"] or "flat")
         out["roof_surface"] = {"surface_sqft": round(r.surface), "allowed_sqft": round(r.allowed), "formula": r.formula}
     return out

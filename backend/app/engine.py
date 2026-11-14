@@ -9,6 +9,7 @@ import copy
 from datetime import datetime
 
 from .fixtures import CLAIMS
+from .intake import EXTRA_BUILDINGS
 from .rules import build_judge_claim
 from .settings import settings
 
@@ -52,7 +53,7 @@ class Engine:
         return {
             "rev": self.rev, "claims": self.claims, "samples": list(self.samples.values()),
             "steps": self.steps, "status": self.status, "review": self.review, "retry": self.retry,
-            "log": self.log, "queue": self.queue, "current": self.current,
+            "log": self.log, "queue": self.queue, "current": self.current, "buildings_extra": EXTRA_BUILDINGS,
         }
 
     def _changed(self) -> None:
