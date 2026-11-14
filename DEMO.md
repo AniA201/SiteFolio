@@ -23,6 +23,20 @@
 
 Backup if the network fails: Ollama alone runs the agent offline; if that fails too, the recorded plan replays.
 
+## Solana track (30 seconds)
+
+**Before judging:** Phantom installed, Testnet mode on, Devnet selected; app wallet funded (`/api/solana/status`).
+Run DRW-0412 so it waits in Review (Lender view). Keep the Explorer tab ready.
+
+1. "The AI finds the evidence, but it can't move money. Only a person's signature can, and Solana proves what they
+   approved." Review → Connect Phantom → Release $461,538, hold $138,462 → sign in Phantom.
+2. Open "Recorded on Solana ↗": one transaction paid the builder, moved $138,462 into a 2-of-2 holding account
+   (lender + Plumbline) and recorded the evidence fingerprint in a memo.
+3. Verify evidence → green. Edit the evidence (demo) → red: "Evidence changed after approval." Undo.
+4. "New scan verified: release $138,462" → sign again: the held money moves with both signatures and its own receipt.
+
+If Phantom misbehaves, disconnect it: the same flow runs with the demo lender key.
+
 ## Numbers to have ready
 - 5,245 properties in the CoStar kit, 99% checkable against all three layers; 15,092 Matterport scans.
 - Live evaluation: the agent's decisions match the plain-code rules on the demo claims (`python -m scripts.eval_agent`).

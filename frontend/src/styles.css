@@ -364,3 +364,11 @@ footer{margin-top:64px;background:var(--g1);padding:40px 0}
   .history-events li { grid-template-columns: 58px minmax(0,1fr); gap: 7px; }
   .history-events li > span { grid-column: 2; }
 }
+
+/* Solana receipt */
+.sol-panel{margin-top:18px;padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
+.sol-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:12px}
+.sol-grid>div{display:grid;gap:2px;min-width:0}.sol-grid b{overflow:hidden;text-overflow:ellipsis}
+.sol-check{margin-top:12px;padding:10px 12px;border-radius:10px;font-size:14px;line-height:1.45}
+.sol-check.ok{background:var(--greenBg);color:var(--green)}.sol-check.bad{background:var(--redBg);color:var(--red)}
+.sol-wallet{display:flex;align-items:center;gap:8px;flex-wrap:wrap}

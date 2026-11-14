@@ -104,9 +104,26 @@ Production: `npm run build` in `frontend/`, then the backend serves `frontend/di
 
 With the real data built, buildings and measurements are real (CoStar kit, Vexcel, Matterport); parties, bills, bank accounts and surcharge history are sample data. Without it, everything is sample data.
 
+## Solana: receipts and payments (devnet, free)
+Every decision a person approves in Review becomes one Solana devnet transaction that does three things at once:
+1. pays the verified amount to the contractor or builder (in "Plumbline USD", a test token we mint on devnet),
+2. moves the unproven amount into a holding account owned by a **2-of-2 SPL Token multisig** (the lender and
+   Plumbline's verifier), so neither can release it alone,
+3. records a memo with the claim id, the decision, the amounts and a **SHA-256 fingerprint of the evidence**.
+
+The agent never holds a key. The approver signs with **Phantom** (Review → Connect Phantom); without Phantom, a demo
+lender key on this laptop signs instead. **Verify** recomputes the fingerprint and compares it with the one on chain;
+**Edit the evidence (demo)** shows it turn red. When a later scan proves the remaining work, **release** moves the held
+money with both signatures and a new receipt. Blocks, rejections and rent decisions are receipts only (no money).
+
+Setup (free, devnet only): the app wallet is created at `backend/app/data/solana/app_wallet.json` (gitignored) on first
+use; fund its address with devnet SOL at https://faucet.solana.com (`GET /api/solana/status` shows the address and
+balance). Phantom needs no SOL: the app pays the fees. Set `PLUMBLINE_SOLANA=off` to turn it off.
+
 ## Open-source credits
 - Agent: [deepagents](https://github.com/langchain-ai/deepagents), LangChain, LangGraph; tracing in LangSmith (free tier).
 - Free models: OpenAI gpt-oss (open weights) and Qwen, served by Groq's free tier, with fallback to Ollama on the laptop.
 - Backend: FastAPI, Uvicorn, httpx, pydantic, pypdf, pyzipper, qrcode.
 - Frontend: React, Vite, Three.js; Matterport Showcase SDK for the 3D tours.
+- Solana: solana-py, solders, @solana/web3.js, SPL Token and Memo programs, Phantom wallet (devnet).
 - Data: CoStar hackathon kit, Vexcel aerial imagery, Matterport scans (used under the hackathon's terms; not in this repo).
