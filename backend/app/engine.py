@@ -39,6 +39,8 @@ class Engine:
         self.queue: list[str] = []
         self.current: str | None = None
         self.judge_n = 1
+        self.paused: dict = {}          # claim id -> agent Run waiting at the human pause
+        self.agent_memory: dict = {}    # the agent's /memories/ files, for the page
         self.upload_n = 0
         # Never go backwards: open pages ignore snapshots older than the last one they saw, so a reset keeps counting.
         self.rev = getattr(self, "rev", 0) + 1
@@ -55,6 +57,7 @@ class Engine:
             "rev": self.rev, "claims": self.claims, "samples": list(self.samples.values()),
             "steps": self.steps, "status": self.status, "review": self.review, "retry": self.retry,
             "log": self.log, "queue": self.queue, "current": self.current, "buildings_extra": EXTRA_BUILDINGS,
+            "agent_memory": self.agent_memory,
         }
 
     def _changed(self) -> None:
@@ -97,6 +100,13 @@ class Engine:
     def reset(self, cid: str) -> None:
         if self.current == cid:
             return
+        self.paused.pop(cid, None)
+        claim = self.find(cid)
+        if claim and claim.get("recorded_steps") is not None:  # back to the recorded plan until the agent runs again
+            claim["steps"] = claim["recorded_steps"]
+            claim["outcome"] = claim.get("recorded_outcome", claim["outcome"])
+            claim.pop("agent", None)
+            claim.pop("evidence_files", None)
         self.steps[cid] = -1
         self.status[cid] = "ready"
         self.review.pop(cid, None)
@@ -114,6 +124,25 @@ class Engine:
         else:
             self.review.pop(cid, None)
         self._changed()
+        run = self.paused.pop(cid, None) if decision else None
+        if run is not None:  # the person decided: resume the same agent run from its pause
+            asyncio.run_coroutine_threadsafe(self._resume(cid, run, decision), self._event_loop)
+
+    async def _resume(self, cid: str, run, decision: str) -> None:
+        from .agent.runner import resume
+        claim = self.find(cid)
+        if claim is None:
+            return
+        loop = asyncio.get_running_loop()
+        verb = {"ok": "approved", "sent": "approved and sent the message", "rejected": "rejected"}.get(decision, decision)
+        self._push_step(cid, claim, ["coordinator", f"Person {verb}: agent resumed the same run", "done"])
+        try:
+            await asyncio.to_thread(resume, run, decision, lambda s: loop.call_soon_threadsafe(self._push_step, cid, claim, s))
+            claim["evidence_files"] = run.files
+            self.agent_memory = run.memory
+            self._push_step(cid, claim, ["coordinator", "Run finished and logged", "done"])
+        except Exception as e:
+            self._push_step(cid, claim, ["coordinator", f"Could not resume the agent ({type(e).__name__}); decision recorded", "warn"])
 
     def ingest(self, sample_id: str) -> str | None:
         sample = self.samples.pop(sample_id, None)
@@ -145,6 +174,7 @@ class Engine:
 
     # ---------- runner ----------
     def start(self) -> None:
+        self._event_loop = asyncio.get_running_loop()  # API routes run in worker threads; they hand work back to this loop
         self._task = asyncio.create_task(self._loop())
 
     async def stop(self) -> None:
@@ -183,26 +213,45 @@ class Engine:
         from .agent.runner import outcome_from, run_claim
         loop = asyncio.get_running_loop()
         recorded = claim["steps"]
+        claim.setdefault("recorded_steps", recorded)
+        claim.setdefault("recorded_outcome", claim["outcome"])
         claim["steps"] = []
         try:
-            proposed = await asyncio.to_thread(run_claim, claim, lambda s: loop.call_soon_threadsafe(self._push_step, cid, claim, s))
+            run = await asyncio.to_thread(run_claim, claim, lambda s: loop.call_soon_threadsafe(self._push_step, cid, claim, s))
         except Exception as e:  # network, rate limit, model refusal: the demo keeps working
-            proposed, error = None, e
+            run, error = None, e
         else:
             error = None
         await asyncio.sleep(0)  # let queued step callbacks land
-        if not proposed:
-            claim["steps"] = recorded
+        if run is None or not run.proposed:
+            claim["steps"] = claim["recorded_steps"]
             self.steps[cid] = 0
             self.log.insert(0, {"t": datetime.now().strftime("%H:%M:%S"), "who": "Coordinator",
                                 "text": f"{cid} · Live agent unavailable ({type(error).__name__ if error else 'no decision'}); replaying the recorded plan", "ok": "warn"})
             return False
-        claim["outcome"] = outcome_from(proposed, claim)
+        outcome = outcome_from(run, claim)
+        if outcome.get("overruled"):
+            self._push_step(cid, claim, ["rules", "Rules overruled the agent: " + outcome["overruled"], "warn"])
+        claim["outcome"] = outcome
+        claim["evidence_files"] = run.files
+        claim["agent"] = {"live": True, "plans": run.plans, "models": {n: run.served.count(n) for n in set(run.served)},
+                          "overruled": outcome.get("overruled"), "run_id": run.run_id, "trace_url": None}
+        self.agent_memory = run.memory
+        self.paused[cid] = run
+        loop.create_task(self._trace_url(cid, claim, run.run_id))
         self.steps[cid] = len(claim["steps"])
         self.status[cid] = claim["outcome"]["status"]
         self.current = None
         self._changed()
         return True
+
+    async def _trace_url(self, cid: str, claim: dict, run_id: str) -> None:
+        """LangSmith link for the run, once the trace has been sent (best effort)."""
+        from .agent.tracing import trace_url
+        url = await asyncio.to_thread(trace_url, run_id)
+        if url and claim.get("agent", {}).get("run_id") == run_id:
+            claim["agent"]["trace_url"] = url
+            self._changed()
 
     async def _replay(self, cid: str, claim: dict) -> None:
         while self.current == cid:

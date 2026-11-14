@@ -16,3 +16,4 @@ backend/app/data/models_index.csv
 backend/app/data/AGENTS.md
 *.zip
 backend/app/data/real/
+backend/app/data/agent_memory.json
