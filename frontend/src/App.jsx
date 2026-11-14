@@ -14,7 +14,8 @@ import Fool from "./pages/Fool";
 import Buildings from "./pages/Buildings";
 import FoolPhone from "./pages/FoolPhone";
 
-const NAV = [["overview", "Overview"], ["claims", "Claims"], ["buildings", "Buildings"], ["review", "Review"], ["tenant", "Tenant view"], ["history", "History"], ["thinks", "How it thinks"]];
+const NAV = [["overview", "Overview"], ["claims", "Claims"], ["buildings", "Buildings"], ["review", "Review"], ["history", "History"]];
+const TOOLS = [["tenant", "Tenant view"], ["thinks", "How it thinks"], ["fool", "Try to fool it"]];
 const PARENT = { claim: "claims", building: "buildings" };
 
 const readHash = () => {
@@ -26,10 +27,11 @@ const go = (page, id) => { location.hash = "#/" + page + (id ? "/" + id : ""); }
 export default function App() {
   const [route, setRoute] = useState(readHash);
   const [persona, setPersona] = useState("owner");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [state, apply] = useBackend();
 
   useEffect(() => {
-    const onHash = () => { setRoute(readHash()); window.scrollTo(0, 0); };
+    const onHash = () => { setRoute(readHash()); setMenuOpen(false); window.scrollTo(0, 0); };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
@@ -72,20 +74,38 @@ export default function App() {
 
   return (
     <div>
-      <div className="navwrap"><nav className="nav">
-        <span className="word" onClick={() => go("overview")}>PLUMBLINE</span>
+      <a className="skip-link" href="#main" onClick={event => { event.preventDefault(); document.querySelector("#main").focus(); }}>Skip to content</a>
+      <div className="navwrap"><nav className="nav" aria-label="Workspace">
+        <a className="word" href="#/overview"><svg viewBox="0 0 20 23" width="18" height="21" aria-hidden="true"><path d="M10 1v10m0 0-5 5 5 6 5-6-5-5Z" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>Plumbline</a>
         <div className="navlinks">
-          {NAV.map(([k, l]) => <a key={k} className={active === k ? "on" : ""} onClick={() => go(k)}>{l}{k === "review" && reviewCount > 0 && <span className="badge">{reviewCount}</span>}</a>)}
+          {NAV.map(([k, l]) => <a key={k} href={`#/${k}`} aria-current={active === k ? "page" : undefined} className={active === k ? "on" : ""}>{l}{k === "review" && reviewCount > 0 && <span className="nav-count" aria-label={reviewCount + " pending"}>{reviewCount}</span>}</a>)}
         </div>
-        {running && <span className="tag t-running" style={{ marginRight: 6 }}><i />Checking</span>}
-        <div className="orgsw">
-          {Object.entries(PERSONAS).map(([k, v]) => <button key={k} className={persona === k ? "on" : ""} onClick={() => { setPersona(k); if (page === "claim") go("claims"); }}>{v.short}</button>)}
+        <div className="nav-tools" onKeyDown={event => {
+          if (event.key === "Escape" && menuOpen) {
+            setMenuOpen(false);
+            event.currentTarget.querySelector("button").focus();
+          }
+        }} onBlur={event => {
+          if (!event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false);
+        }}>
+          <button type="button" className="nav-menu-button" aria-expanded={menuOpen} aria-controls="workspace-tools"
+            onClick={() => setMenuOpen(!menuOpen)}>
+            {PERSONAS[persona].short} <span aria-hidden="true">⌄</span>
+          </button>
+          <div className="nav-menu" id="workspace-tools" hidden={!menuOpen}>
+            <label>Workspace<select aria-label="Workspace persona" value={persona} onChange={event => {
+              setPersona(event.target.value);
+              if (page === "claim") go("claims");
+            }}>
+              {Object.entries(PERSONAS).map(([k, v]) => <option key={k} value={k}>{v.short}</option>)}
+            </select></label>
+            {TOOLS.map(([key, label]) => <a key={key} href={`#/${key}`} onClick={() => setMenuOpen(false)} aria-current={active === key ? "page" : undefined}>{label}</a>)}
+          </div>
         </div>
-        <button className="cta" onClick={() => go("fool")}>Try to fool it</button>
       </nav></div>
-      {state.rev >= 0 && body}
+      <main id="main" tabIndex={-1}>{state.rev >= 0 ? body : <p className="wrapx" role="status">Loading workspace…</p>}</main>
       <footer><div className="wrapx row between wrap">
-        <span className="small muted">PLUMBLINE · Check the paper against the building · CoStar · Vexcel · Matterport · deepagents · Tiger Data · Vultr</span>
+        <span className="small muted">Plumbline · Building evidence for payment review</span>
         <Flag t={META.data_note || "All buildings, parties and numbers are sample data"} />
       </div></footer>
     </div>

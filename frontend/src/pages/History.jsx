@@ -1,85 +1,59 @@
-import { SURCHARGES } from "../data";
-import { FINAL, Flag, Head, sumNum } from "../lib";
+import { useState } from "react";
+import { META, SURCHARGES } from "../data";
+import { Head } from "../lib";
 
-const WEEKS = ["Sep 28", "Oct 5", "Oct 12", "Oct 19", "Oct 26", "Nov 2", "This week"];
-// Past weeks per persona: [main, held]. Sample history.
-const PAST = {
-  owner: [[41, 0], [38, 4], [52, 0], [47, 1], [35, 0], [58, 10]],
-  reviewer: [[3, 1], [2, 0], [4, 2], [3, 1], [5, 2], [2, 1]],
-  lender: [[300, 0], [0, 0], [450, 50], [0, 0], [250, 0], [0, 0]],
-};
-const LABELS = { reviewer: ["Checked", "Reduced or denied", "applications"], lender: ["Released", "Held", "$ thousands"], owner: ["Paid", "Held", "$ thousands"] };
-
-const DOUBLE_CHARGE_SQL = `SELECT * FROM surcharges
-WHERE property = $1
-  AND work = 'roof'
-  AND ends_at > now();`;
-const WEEKLY_SQL = `SELECT create_hypertable('events', 'at');
-
-CREATE MATERIALIZED VIEW weekly
-WITH (timescaledb.continuous) AS
-SELECT time_bucket('1 week', at) AS week,
-       persona, sum(paid), sum(held)
-FROM events GROUP BY week, persona;`;
+const VIEWS = [["all", "Activity"], ["flagged", "Flags"], ["registry", "Surcharge registry"]];
+const OUTCOMES = { done: "Passed", fail: "Flagged", warn: "Needs attention" };
 
 export default function History({ S, A }) {
-  const events = 1284310 + S.log.length;
-  const caught = S.status["RSO-3110"] === "denied" ? 1 : 0;
-  const done = S.list.filter(c => FINAL.includes(S.status[c.id]));
-  const now = S.persona === "reviewer"
-    ? [done.length, done.filter(c => c.outcome.status !== "approved").length]
-    : [Math.round(sumNum(done, "a") / 1000), Math.round(sumNum(done, "b") / 1000)];
-  const data = [...PAST[S.persona], now], max = Math.max(...data.map(d => d[0] + d[1]), 1);
-  const lab = LABELS[S.persona];
-  const stats = [["Events stored", events.toLocaleString(), "documents, checks, decisions"], ["Double charges caught", caught, "same work billed twice"], ["Dashboard query", "38 ms", "continuous aggregate"], ["Storage after compression", "91% smaller", "hypertable compression"]];
+  const [view, setView] = useState("all");
+  const [query, setQuery] = useState("");
+  const ids = new Set(S.all.map(claim => claim.id));
+  const events = S.log.map(event => {
+    const id = event.text.split(" · ", 1)[0];
+    return { ...event, id: ids.has(id) ? id : null };
+  });
+  const flags = events.filter(event => event.ok === "fail" || event.ok === "warn");
+  const registry = view === "registry";
+  const search = query.trim().toLowerCase();
+  const rows = (registry ? SURCHARGES : view === "flagged" ? flags : events).filter(row => (
+    (registry ? [row.building, row.property_id, row.work] : [row.text, row.who, OUTCOMES[row.ok]])
+      .some(value => value?.toLowerCase().includes(search))
+  ));
+  const counts = { all: events.length, flagged: flags.length, registry: SURCHARGES.length };
+
   return (
-    <div className="wrapx">
-      <Head over="Tiger Data · time-series history" title="History" lede="Every document, check, payment and rent surcharge is stored as a time-stamped event. That's how Plumbline knows when the same work is charged twice." />
-      <div className="grid g4">
-        {stats.map(([l, v, d]) => <div className="tile" key={l}><div className="over">{l}</div><div className="stat num" style={{ fontSize: 34 }}>{v}</div><div className="muted small" style={{ marginTop: 8 }}>{d}</div></div>)}
+    <div className="wrapx history">
+      <Head title="History" lede="Find a past check, follow a flag, or look up a registered surcharge." />
+      <div className="history-toolbar">
+        <div className="history-filters" role="group" aria-label="History view">
+          {VIEWS.map(([key, label]) => <button type="button" key={key} aria-pressed={view === key} onClick={() => { setView(key); setQuery(""); }}>{label} <span>{counts[key]}</span></button>)}
+        </div>
+        <input type="search" aria-label={registry ? "Search registry" : "Search activity"} placeholder={registry ? "Search buildings or work" : "Search claims or checks"} value={query} onChange={event => setQuery(event.target.value)} />
       </div>
-      <section className="grid g32">
-        <div className="tile">
-          <div className="row between"><h4>{lab[0]} vs {lab[1]}, per week ({lab[2]})</h4></div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 14, height: 220, marginTop: 24, paddingBottom: 26 }}>
-            {data.map((d, i) => (
-              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%", position: "relative" }}>
-                <div style={{ height: (d[1] / max) * 100 + "%", background: "var(--amber)", borderRadius: "6px 6px 0 0" }} />
-                <div style={{ height: (d[0] / max) * 100 + "%", background: "#000", borderRadius: d[1] ? 0 : "6px 6px 0 0" }} />
-                <span className="small muted" style={{ position: "absolute", bottom: -24, left: 0, right: 0, textAlign: "center", fontWeight: i === 6 ? 700 : 400 }}>{WEEKS[i]}</span>
-              </div>
-            ))}
-          </div>
-          <p className="muted small">This week's bar fills in as you run checks.</p>
-        </div>
-        <div className="tile">
-          <h4>The double-charge check</h4>
-          <pre className="json" style={{ marginTop: 12 }}>{DOUBLE_CHARGE_SQL}</pre>
-          <p className="muted small" style={{ lineHeight: 1.5 }}>Runs on every rent application and every bill. It caught the Vermont Gardens roof being charged to tenants twice.</p>
-          <button className="btn black sm" onClick={() => { A.setPersona("reviewer"); A.go("claims"); }}>Try it on Vermont Gardens</button>
-        </div>
-      </section>
-      <div className="tbl"><table>
-        <thead><tr><th>Building</th><th>Work</th><th>Approved</th><th>Ends</th><th>Per unit / month</th></tr></thead>
-        <tbody>
-          {SURCHARGES.map(s => (
-            <tr key={s.property_id + s.work} className={s.work === "Roof" ? "bad" : ""}>
-              <td><b>{s.building}</b> <span className="mono muted small">{s.property_id}</span></td>
-              <td>{s.work}</td><td>{s.approved}</td><td>{s.ends}</td><td className="num">{s.per_unit}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table></div>
-      <section className="grid g2">
-        <div className="tile"><h4>How the weekly chart is stored</h4><pre className="json" style={{ marginTop: 12 }}>{WEEKLY_SQL}</pre></div>
-        <div className="tile">
-          <h4>Live events</h4>
-          <div className="term" style={{ marginTop: 12, maxHeight: 220 }}>
-            {S.log.length === 0 ? <span className="g">Run a check to stream events here.</span> : S.log.slice(0, 9).map((l, k) => <div key={k}><span className="g">INSERT</span> {l.t} · {l.who} · {l.text.slice(0, 46)}</div>)}
-          </div>
-        </div>
-      </section>
-      <Flag t="Sample history · storage and timing figures are placeholders" />
+      {rows.length > 0 ? <div className="history-results" key={view}>
+        {registry ? <div className="tbl"><table>
+          <thead><tr><th scope="col">Building</th><th scope="col">Work</th><th scope="col">Approved</th><th scope="col">Ends</th><th scope="col">Per unit / month</th></tr></thead>
+          <tbody>{rows.map(s => <tr key={s.property_id + s.work}>
+            <td><b>{s.building}</b><br /><span className="mono muted small">{s.property_id}</span></td>
+            <td>{s.work}</td><td>{s.approved}</td><td>{s.ends}</td><td className="num">{s.per_unit}</td>
+          </tr>)}</tbody>
+        </table></div> : <ul className="history-events">{rows.map((event, index) => (
+          <li key={event.t + event.text + index}>
+            <time className="mono">{event.t}</time>
+            <div>{event.id ? <a href={`#/claim/${event.id}`}>{event.text.slice(event.id.length + 3)} <span aria-hidden="true">↗</span></a> : event.text}
+              <small>{event.who}{event.id && " · " + event.id}</small></div>
+            <span className={event.ok === "done" ? "muted" : "history-flag"}>{OUTCOMES[event.ok] ?? "Event"}</span>
+          </li>
+        ))}</ul>}
+      </div> : <div className="history-empty">
+        <p>{search ? "No matching records." : registry ? "No surcharges in the registry." : view === "flagged" ? "No flags in recent activity." : "Run a claim check to see its activity here."}</p>
+        {search ? <button className="btn white sm" onClick={() => setQuery("")}>Clear search</button> : !registry && <a className="btn white sm" href="#/claims">Open claims</a>}
+      </div>}
+      {registry && <div className="history-note">
+        <p className="muted small">{META.real ? "Surcharge registry" : "Sample surcharge registry"}</p>
+        <button className="btn white sm" onClick={() => { A.setPersona("reviewer"); A.go("claims"); }}>Open rent applications</button>
+      </div>}
     </div>
   );
 }

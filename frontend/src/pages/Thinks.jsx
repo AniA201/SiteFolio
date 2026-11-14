@@ -4,7 +4,7 @@ import { Flag, Head, J, NEEDS, WHO } from "../lib";
 
 const STACK = [["Agent", "deepagents"], ["Data", "CoStar · Vexcel · Matterport"], ["History", "Tiger Data"], ["Hosting + GPU", "Vultr"], ["Money and rent math", "plain code, no AI"]];
 const LANES = ["coordinator", "records", "roof", "interior", "rules"];
-const LANE_COLOR = { coordinator: "#000", records: "#6E6E6E", roof: "#FFAA00", interior: "#2457C5", rules: "#1E8E4E" };
+const LANE_COLOR = { coordinator: "var(--ink)", records: "var(--ink3)", roof: "var(--accent)", interior: "var(--g3)", rules: "var(--ink2)" };
 
 export default function Thinks({ S, A }) {
   const [sel, setSel] = useState(null);
@@ -19,7 +19,7 @@ export default function Thinks({ S, A }) {
     <div className="wrapx">
       <Head over="For the LangChain judges" title="How it thinks" lede="A LangChain deep agent: it plans, sends helper agents to each data source, changes its plan when a check fails, keeps an evidence folder, remembers past claims and waits for a person." right={<button className="btn gray">Open LangSmith trace ↗</button>} />
       <div className="row wrap" style={{ marginBottom: 18, gap: 8 }}>
-        {STACK.map(([k, v]) => <span key={k} className="tag t-ready" style={{ fontSize: 13, padding: "8px 14px" }}><b style={{ color: "#000" }}>{k}</b>&nbsp;{v}</span>)}
+        {STACK.map(([k, v]) => <span key={k} className="tag t-ready" style={{ fontSize: 13, padding: "8px 14px" }}><b style={{ color: "var(--ink)" }}>{k}</b>&nbsp;{v}</span>)}
       </div>
       <div className="row wrap" style={{ marginBottom: 18 }}>
         {S.list.map(x => <button key={x.id} className={"btn sm " + (x.id === c.id ? "black" : "gray")} onClick={() => setSel(x.id)}>{x.id}</button>)}
