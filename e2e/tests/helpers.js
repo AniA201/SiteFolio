@@ -1,9 +1,40 @@
 // Shared steps for the click-through tests: reset, switch persona, run a claim from its page, read the decision,
 // and a stand-in Phantom wallet that signs real devnet transactions from the test process.
-const { expect } = require("@playwright/test");
+const base = require("@playwright/test");
+const { expect } = base;
 const { Keypair, Transaction } = require("@solana/web3.js");
 
 const LIVE = process.env.E2E_LIVE === "1";
+const WATCHING = process.env.E2E_HEADLESS !== "1" && Number(process.env.E2E_SLOWMO ?? 900) > 0;
+
+/**
+ * The test runner used by every spec: shows the scenario's name as a caption at the bottom of the page, and pauses
+ * on the final screen so you can see the result before the next scenario starts.
+ */
+const test = base.test.extend({
+  page: async ({ page }, use, testInfo) => {
+    if (WATCHING) {
+      await page.addInitScript(title => {
+        const show = () => {
+          if (document.getElementById("e2e-caption")) return;
+          const el = document.createElement("div");
+          el.id = "e2e-caption";
+          el.textContent = "▶ " + title;
+          el.style.cssText = "position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:2147483647;max-width:90vw;"
+            + "padding:10px 18px;border-radius:12px;background:rgba(20,20,16,.92);color:#fff;font:600 15px/1.35 system-ui,sans-serif;"
+            + "box-shadow:0 6px 24px rgba(0,0,0,.35);pointer-events:none";
+          document.body.appendChild(el);
+        };
+        if (document.body) show(); else document.addEventListener("DOMContentLoaded", show);
+      }, testInfo.title);
+    }
+    await use(page);
+    if (WATCHING && testInfo.status === "passed") await page.waitForTimeout(1500);  // look at the result
+  },
+});
+
+/** A short pause at key moments (after a decision appears) so the result can be read; no-op when not watching. */
+const beat = (page, ms = 1200) => (WATCHING ? page.waitForTimeout(ms) : Promise.resolve());
 
 // Status words the app shows (frontend/src/lib.jsx TAG).
 const LABEL = {
@@ -52,6 +83,8 @@ async function expectDecision(page, status, a, b) {
   const money = tile.locator(".bigmoney");
   if (a !== undefined) await expect(money.nth(0)).toHaveText(a);
   if (b !== undefined) await expect(money.nth(1)).toHaveText(b);
+  await tile.scrollIntoViewIfNeeded();
+  await beat(page);
 }
 
 /** Wait until the server reports a final status for a claim (for claims queued by uploads, samples or the phone page). */
@@ -107,5 +140,5 @@ async function solanaReady(request) {
   return !!s.ready;
 }
 
-module.exports = { LIVE, LABEL, resetApp, watchErrors, persona, open, runClaim, expectDecision, decisionTile, waitForStatus,
+module.exports = { test, expect, beat, LIVE, LABEL, resetApp, watchErrors, persona, open, runClaim, expectDecision, decisionTile, waitForStatus,
   stateClaims, installWallet, solanaReady };

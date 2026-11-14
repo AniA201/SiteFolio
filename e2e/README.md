@@ -14,7 +14,7 @@ live site are never touched.
 
 | Option | What it does |
 |---|---|
-| `E2E_SLOWMO=0` | Full speed (default 250 ms between actions) |
+| `E2E_SLOWMO=0` | Full speed (default 900 ms between actions, with a caption naming each scenario) |
 | `E2E_HEADLESS=1` | Hide the browser window |
 | `E2E_LIVE=1` | Use the live deep agent on the free models instead of the recorded plans (30–100 s per check) |
 | `E2E_TIGER=1` | Write to Tiger Cloud (off by default so tests don't add to the shared history) |

@@ -1,6 +1,5 @@
 // Lender persona: construction loan draws on Lenox Timbergrove (docs/TESTING.md L1–L2).
-const { test, expect } = require("@playwright/test");
-const { resetApp, persona, open, runClaim, expectDecision, waitForStatus } = require("./helpers");
+const { test, expect, resetApp, persona, open, runClaim, expectDecision, waitForStatus } = require("./helpers");
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ request }) => resetApp(request));

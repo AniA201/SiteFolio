@@ -1,7 +1,6 @@
 // Human in the loop and Solana (docs/TESTING.md H1–H7): approve, reject, the devnet receipt, Verify, the evidence
 // edit, Phantom signing and releasing held money. Solana steps are skipped if the app wallet has no devnet SOL.
-const { test, expect } = require("@playwright/test");
-const { LIVE, resetApp, persona, open, runClaim, installWallet, solanaReady } = require("./helpers");
+const { test, expect, LIVE, resetApp, persona, open, runClaim, installWallet, solanaReady } = require("./helpers");
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ request }) => resetApp(request));

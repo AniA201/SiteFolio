@@ -1,6 +1,5 @@
 // Owner persona: contractor bills on 1113 Vine St (docs/TESTING.md O1–O5).
-const { test, expect } = require("@playwright/test");
-const { resetApp, watchErrors, persona, open, runClaim, expectDecision, waitForStatus } = require("./helpers");
+const { test, expect, resetApp, watchErrors, persona, open, runClaim, expectDecision, waitForStatus } = require("./helpers");
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ request }) => resetApp(request));

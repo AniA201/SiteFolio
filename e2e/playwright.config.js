@@ -5,7 +5,8 @@
 //     deep agent on the free models instead (slower: 30-100 s per check).
 //   - Tiger Cloud off (tests never write to the shared history); E2E_TIGER=1 turns it on.
 //   - Bedrock stays off (backend/.env); Solana devnet is on (free test SOL).
-// The window is visible and slowed down so you can watch each click (E2E_SLOWMO=0 for full speed, E2E_HEADLESS=1 to hide it).
+// The window is visible and slowed down (900 ms per action, a caption shows the scenario) so you can follow each click.
+// E2E_SLOWMO=250 is quicker, E2E_SLOWMO=0 full speed, E2E_HEADLESS=1 hides the window.
 const { defineConfig, devices } = require("@playwright/test");
 
 const PORT = Number(process.env.E2E_PORT || 8799);
@@ -15,14 +16,14 @@ module.exports = defineConfig({
   testDir: "./tests",
   fullyParallel: false,
   workers: 1, // one shared app, one browser: scenarios run in order like a person clicking through
-  timeout: (live ? 6 : 2) * 60_000,
+  timeout: (live ? 8 : 4) * 60_000,
   expect: { timeout: live ? 150_000 : 30_000 },
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
   use: {
     baseURL: `http://localhost:${PORT}`,
     headless: process.env.E2E_HEADLESS === "1",
     viewport: { width: 1440, height: 900 },
-    launchOptions: { slowMo: Number(process.env.E2E_SLOWMO ?? 250) },
+    launchOptions: { slowMo: Number(process.env.E2E_SLOWMO ?? 900) },  // ms between actions, slow enough to follow
     screenshot: "only-on-failure",
     video: "retain-on-failure",
     trace: "retain-on-failure",

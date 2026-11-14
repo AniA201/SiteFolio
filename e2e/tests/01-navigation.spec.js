@@ -1,6 +1,5 @@
 // Every page opens for every persona without errors, and the server's integrations are up.
-const { test, expect } = require("@playwright/test");
-const { LIVE, resetApp, watchErrors, persona, open } = require("./helpers");
+const { test, expect, LIVE, resetApp, watchErrors, persona, open } = require("./helpers");
 
 test.beforeAll(async ({ request }) => resetApp(request));
 

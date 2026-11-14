@@ -1,6 +1,5 @@
 // Reviewer persona: LA rent increase applications (docs/TESTING.md R1–R2).
-const { test, expect } = require("@playwright/test");
-const { resetApp, persona, open, runClaim, expectDecision, waitForStatus } = require("./helpers");
+const { test, expect, resetApp, persona, open, runClaim, expectDecision, waitForStatus } = require("./helpers");
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ request }) => resetApp(request));
