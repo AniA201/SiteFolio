@@ -17,6 +17,8 @@ from .engine import Engine
 from .fixtures import BUILDINGS, META, PARTIES, PERSONAS, SURCHARGES, USING_REAL
 from .routes_data import router as data_router
 from .routes_report import router as report_router
+from .routes_intake import router as intake_router
+from .routes_kit import router as kit_router
 from .settings import settings
 from .tiger import TigerHistory
 
@@ -75,7 +77,8 @@ def meta():
     return {"buildings": BUILDINGS, "parties": PARTIES, "personas": PERSONAS, "surcharges": SURCHARGES,
             "meta": META, "real": USING_REAL,
             # Browser-safe by design (Matterport SDK keys are domain-locked); every other key stays server-side.
-            "matterport_sdk_key": settings.matterport_sdk_key}
+            "matterport_sdk_key": settings.matterport_sdk_key, "public_url": settings.public_url,
+            "has_ai_reader": bool(settings.anthropic_api_key)}
 
 
 @app.get("/api/state")
@@ -173,6 +176,8 @@ def reset_everything():
 
 app.include_router(data_router)
 app.include_router(report_router)
+app.include_router(intake_router)
+app.include_router(kit_router)
 
 
 # ---------- built frontend (production) ----------

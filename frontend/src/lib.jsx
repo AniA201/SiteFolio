@@ -23,10 +23,7 @@ export const sumNum = (arr, k) => arr.reduce((t, c) => t + (typeof c.outcome[k][
 export const Tag = ({ s }) => <span className={"tag " + TAG[s][0]}><i />{TAG[s][1]}</span>;
 export const Flag = ({ t = "Sample data" }) => <span className="flag">{t}</span>;
 
-const LAYER_STYLE = { background: "#FFF4D6", color: "#8A5A00", border: "1px solid #FFAA00" };
-const TIGER_STYLE = { background: "#E1F5EE", color: "#085041" };
-const OTHER_STYLE = { background: "var(--g1)", color: "var(--ink2)" };
-export const SvcChip = ({ s }) => <span className="tag" style={isLayer(s) ? LAYER_STYLE : s === "Tiger Data" ? TIGER_STYLE : OTHER_STYLE}>{s}</span>;
+export const SvcChip = ({ s }) => <span className={isLayer(s) ? "tag service-tag service-tag--source" : "tag service-tag"}>{s}</span>;
 
 const CHECK_PATH = { done: "M2 5.2 4.2 7.4 8 3", fail: "M3 3l4 4M7 3 3 7" };
 export function Check({ res }) {

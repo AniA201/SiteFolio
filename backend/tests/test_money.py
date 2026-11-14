@@ -70,3 +70,12 @@ def test_draw_release():  # DRW-0412
 def test_units_must_be_positive():
     with pytest.raises(ValueError):
         money.rent_surcharge(1000, 0)
+
+
+def test_pitch_from_vexcel_shape():
+    assert money.pitch_for_shape("flat") == (0.0, False) and money.pitch_for_shape(None) == (0.0, False)
+    assert money.pitch_for_shape("gable") == (money.STANDARD_PITCH_DEG, True)
+    hip = money.check_roof(2000, 0, 2500, shape="hip")      # 2,000 × 1.118 = 2,236; +15% waste = 2,572
+    assert not hip.inflated and "assumed 6/12 pitch" in hip.formula and round(hip.allowed) == 2572
+    flat = money.check_roof(2000, 0, 2500, shape="flat")    # 2,000 +5% = 2,100
+    assert flat.inflated and "flat roof, 0°" in flat.formula

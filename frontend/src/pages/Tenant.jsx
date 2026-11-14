@@ -38,7 +38,7 @@ export default function Tenant({ S, A, id }) {
           <div className="tile dark" style={{ marginTop: 16 }}>
             <div className="over" style={{ color: "rgba(255,255,255,.6)" }}>What this means for you</div>
             <div className="stat num" style={{ color: "var(--amber)" }}>${((r.claimed - r.verified) * r.months).toFixed(0)}</div>
-            <p style={{ color: "rgba(255,255,255,.75)" }}>less over {r.months / 12} years, per apartment. Status: {S.review[c.id] ? "reviewer decision recorded" : "waiting for the reviewer's final decision"}.</p>
+            <p style={{ color: "rgba(255,255,255,.75)" }}>less over {r.months / 12} years, per apartment.{r.context && <> The claimed increase is {r.context.claimed_pct}% of a typical rent here (${r.context.median_rent.toLocaleString()}/mo on Apartments.com); the verified one is {r.context.verified_pct}%.</>} Status: {S.review[c.id] ? "reviewer decision recorded" : "waiting for the reviewer's final decision"}.</p>
           </div>
           <div className="row wrap" style={{ marginTop: 18 }}>
             <button className="btn black sm" onClick={() => {

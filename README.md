@@ -51,8 +51,12 @@ Real buildings: after the keys are set, fetch and build the real data set (kept 
 ```
 
 ```bash
-.venv/bin/python -m app.real.fetch && .venv/bin/python -m app.real.build
+.venv/bin/python -m app.real.kit_index && .venv/bin/python -m app.real.fetch && .venv/bin/python -m app.real.build
 ```
+
+`kit_index` indexes all 3,339 kit buildings for the Buildings page and joins each to its Apartments.com listing, current tenants, last sale and active listings.
+
+Deep agent: with `ANTHROPIC_API_KEY` set, each check runs the LangChain deep agent in `backend/app/agent/` (a coordinator on Claude Opus 5.5 with roof, interior and records helpers, plain-code money tools, and a pause before any decision). Its plan and tool calls stream into the claim's steps. Without a key, or if a run fails, the recorded plan replays. `PLUMBLINE_AGENT=replay` forces the replay; `LANGSMITH_API_KEY` turns on tracing.
 
 Tests:
 
@@ -88,6 +92,8 @@ Production: `npm run build` in `frontend/`, then the backend serves `frontend/di
 | GET | `/api/data/matterport/models/{id}` | Model basics |
 | GET | `/api/data/matterport/models/{id}/rooms` | Rooms with labels and areas in sq ft |
 | GET | `/api/data/vexcel/ortho.jpg` | `lat, lon, half_side_m, pixels` aerial image |
+| GET | `/api/kit/search` | `q, city, type, scanned` search every building in the CoStar kit |
+| GET | `/api/kit/buildings/{id}` | One kit building: record, dossier, live Vexcel roof facts and the CoStar cross-check |
 | GET | `/api/data/vexcel/property` | `lat, lon` footprint, roof shape/material/condition, rooftop AC count |
 
 With the real data built, buildings and measurements are real (CoStar kit, Vexcel, Matterport); parties, bills, bank accounts and surcharge history are sample data. Without it, everything is sample data.

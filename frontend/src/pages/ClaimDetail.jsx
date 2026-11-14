@@ -1,25 +1,26 @@
 import { useState } from "react";
-import { BUILDINGS, PARTIES, PERSONAS } from "../data";
+import { BUILDINGS, PARTIES, PERSONAS, partyOf } from "../data";
 import { COL, Check, Flag, J, LAYER, SvcChip, Tag, WHO, aerialKind, fmt, isLayer, money, sqft } from "../lib";
 import { Aerial, FloorPlan } from "../components/Illustrations";
 import MatterportTour, { toursFromCall } from "../components/MatterportTour";
+import Dossier from "../components/Dossier";
 
 const TABS = [["run", "Agent run"], ["apis", "Building data calls"], ["cross", "Cross-checks"], ["evidence", "Evidence"]];
 const MEASURED_KINDS = ["roof", "rent", "rentdup", "parking"];
-const DECISION_BG = s => ["blocked", "denied"].includes(s) ? "#FDF0F1" : s === "approved" ? "#EEF7F1" : "#FFF7E0";
+const DECISION_BG = s => s === "approved" ? "var(--surface)" : "var(--accent-soft)";
 const fileName = svc => svc.toLowerCase().replace(" ", "_") + ".json";
 const snake = s => s.toLowerCase().replace(/ /g, "_");
 
 // The real Vexcel orthophoto around the building, served by the backend (key stays server-side).
-function RealAerial({ B, show }) {
+export function RealAerial({ B, show }) {
   const [failed, setFailed] = useState(false);
   const half = Math.max(35, Math.round(Math.sqrt(B.roof * 0.0929) * 0.8));
   const src = `/api/data/vexcel/ortho.jpg?lat=${B.lat}&lon=${B.lon}&half_side_m=${half}&pixels=900`;
   if (failed) return <Aerial b={B.id} kind="roof" show={show} />;
   return (
-    <div style={{ position: "relative", aspectRatio: "1 / 1", background: "#4E5A47" }}>
+    <div style={{ position: "relative", aspectRatio: "1 / 1", background: "var(--ink2)" }}>
       <img src={src} alt={`Aerial view of ${B.name}`} onError={() => setFailed(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", filter: show ? "none" : "grayscale(1) brightness(.8)" }} />
-      {show && <span className="tag" style={{ position: "absolute", left: 10, bottom: 10, background: "#0A0A0A", color: "#FFAA00", fontFamily: "var(--mono)" }}>{B.roof.toLocaleString()} sq ft footprint · {B.ac} AC units</span>}
+      {show && <span className="tag" style={{ position: "absolute", left: 10, bottom: 10, background: "var(--ink)", color: "var(--paper)", fontFamily: "var(--mono)" }}>{B.roof.toLocaleString()} sq ft footprint · {B.ac} AC units</span>}
     </div>
   );
 }
@@ -30,7 +31,7 @@ function RulesBox({ c, done }) {
     <div className="tile">
       <div className="row between"><h4>Rent math</h4><span className="over">Plain code, no AI</span></div>
       <p className="muted small" style={{ marginTop: 6 }}>LA formula: 50% of the cost, spread over 60 months, split across units.</p>
-      <div className="receipt" style={{ background: "#fff" }}>
+      <div className="receipt" style={{ background: "var(--surface)" }}>
         {done ? <>claimed  {fmt(c.amount)} × 50% ÷ 60 ÷ {c.rent.units} = ${c.rent.claimed.toFixed(2)}<br />verified → ${c.rent.verified.toFixed(2)} per unit per month</> : "Waiting for the checks…"}
       </div>
     </div>
@@ -38,12 +39,12 @@ function RulesBox({ c, done }) {
   if (c.persona === "lender") return (
     <div className="tile">
       <div className="row between"><h4>Release math</h4><span className="over">Plain code, no AI</span></div>
-      <div className="receipt" style={{ background: "#fff" }}>
+      <div className="receipt" style={{ background: "var(--surface)" }}>
         {done ? <>requested {fmt(c.amount)} · verified share {c.measured ? Math.round(c.measured / c.claim * 100) : 100}%<br />release {money(o.a[1])} · hold {money(o.b[1])}</> : "Waiting for the checks…"}
       </div>
     </div>
   );
-  const p = PARTIES[c.party], badBank = c.bank && c.bank !== p.acct;
+  const p = partyOf(c), badBank = c.bank && c.bank !== p.acct;
   const checks = [["Approved contractor", true], ["Account matches " + p.acct, !badBank], ["Amount at or below verified", true], ["Not paid before", true]];
   return (
     <div className="tile">
@@ -113,6 +114,7 @@ function RunTab({ S, A, c, step, done, mine, reached, setTab }) {
                 <div key={l}><div className="muted small">{l}</div><div style={{ fontWeight: 600 }}>{x}</div></div>
               ))}
             </div>
+            {reached(ci) && <Dossier d={B.dossier} />}
           </div>
         )}
         {vi >= 0 && (
@@ -123,7 +125,7 @@ function RunTab({ S, A, c, step, done, mine, reached, setTab }) {
               <div className="cmp"><span className="muted">Claimed</span><div className="meter"><i style={{ width: "100%", background: "var(--g3)" }} /></div><span className="num r">{c.claim.toLocaleString()}</span></div>
               <div className="cmp"><span className="muted">Measured</span><div className="meter"><i style={{ width: Math.min(100, c.measured / c.claim * 100) + "%", background: c.measured / c.claim < .95 ? "var(--amber)" : "var(--green)" }} /></div><span className="num r" style={{ fontWeight: 700 }}>{c.measured.toLocaleString()}</span></div>
             </>}
-            {c.roof_formula && reached(vi) && <div className="receipt" style={{ background: "#fff" }}>{c.roof_formula}</div>}
+            {c.roof_formula && reached(vi) && <div className="receipt" style={{ background: "var(--surface)" }}>{c.roof_formula}</div>}
             <div className="muted small" style={{ marginTop: 10 }}>{B.real ? `Vexcel ortho, ${B.vexcel_collection} · roof ${B.pitch.toLowerCase()}${B.roof_material ? ", " + B.roof_material : ""} · ${B.ac} rooftop units counted` : "Illustration · roof outline measured on a Vultr GPU"}</div>
           </div>
         )}
@@ -156,10 +158,10 @@ function ApisTab({ c, reached }) {
         {c.apis.map((a, i) => {
           const r = reached(i), layer = isLayer(a.svc);
           return (
-            <div key={i} className="tile" style={{ background: layer ? "#fff" : "var(--g1)", border: layer ? "2px solid #FFAA00" : "0", opacity: r ? 1 : .45 }}>
+            <div key={i} className="tile" style={{ background: layer ? "var(--surface)" : "var(--g1)", border: layer ? "1px solid var(--accent)" : "0", opacity: r ? 1 : .45 }}>
               <div className="row between">
                 <div className="row">
-                  <span className="num" style={{ width: 26, height: 26, borderRadius: "50%", background: "#000", color: "#fff", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 600 }}>{i + 1}</span>
+                  <span className="num" style={{ width: 26, height: 26, borderRadius: "50%", background: "var(--ink)", color: "var(--paper)", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 600 }}>{i + 1}</span>
                   <h4>{a.title}</h4><SvcChip s={a.svc} /><span className="muted small">{LAYER[a.svc]}</span>
                 </div>
                 <span className="who">{WHO[a.who]}</span>
@@ -185,7 +187,7 @@ function CrossTab({ c, done }) {
         {c.cross.map(([claim, a, b, doc, verdict]) => (
           <div key={claim} style={{ display: "grid", gridTemplateColumns: "140px 1fr 1fr 1fr", gap: 10, marginTop: 12, opacity: done ? 1 : .45 }}>
             <div style={{ fontWeight: 600, paddingTop: 12 }}>{claim}</div>
-            {[a, b].map(x => <div key={x} style={{ background: "#fff", borderRadius: 12, padding: "12px 14px", fontSize: 13.5 }}>{x}</div>)}
+            {[a, b].map(x => <div key={x} style={{ background: "var(--surface)", borderRadius: 12, padding: "12px 14px", fontSize: 13.5 }}>{x}</div>)}
             <div style={{ background: "#FFF4D6", borderRadius: 12, padding: "12px 14px", fontSize: 13.5 }}>{doc}</div>
             <div />
             <div style={{ gridColumn: "2 / 5", background: "#111", color: "#fff", borderRadius: 12, padding: "12px 14px", fontSize: 13.5 }}>{done ? verdict : "Run the agent to compare"}</div>
@@ -203,7 +205,7 @@ function CrossTab({ c, done }) {
 }
 
 function EvidenceTab({ S, c, step, done }) {
-  const o = c.outcome, B = BUILDINGS[c.b], p = PARTIES[c.party];
+  const o = c.outcome, B = BUILDINGS[c.b], p = partyOf(c);
   const files = ["document.json", "plan.md", ...c.apis.filter(a => a.svc !== "AI model").map(a => fileName(a.svc)), "cross_checks.json", "decision.md"];
   const record = {
     id: c.id, persona: c.persona, from: p.name, building: { name: B.name, costar_id: B.cs },
@@ -241,7 +243,7 @@ export default function ClaimDetail({ S, A, id }) {
   const [tab, setTab] = useState("run");
   if (!c) return null;
   const step = S.steps[c.id] ?? -1, st = S.status[c.id] || "ready", done = step >= c.steps.length, mine = S.current === c.id;
-  const B = BUILDINGS[c.b], p = PARTIES[c.party];
+  const B = BUILDINGS[c.b], p = partyOf(c);
   const reached = i => done || c.steps.some((s, k) => s[3] === i && k < step);
   const ctx = { S, A, c, step, done, mine, reached, setTab };
   return (
@@ -251,7 +253,7 @@ export default function ClaimDetail({ S, A, id }) {
         <div className="row between" style={{ alignItems: "flex-end", marginTop: 10 }}>
           <div>
             <h1 className="h1">{c.title}</h1>
-            <div className="row wrap" style={{ marginTop: 14 }}><Tag s={st} /><span className="muted">{p.name} ({p.role.toLowerCase()}) · {B.name}, {B.city} · <b style={{ color: "#000" }}>{fmt(c.amount)}</b></span></div>
+            <div className="row wrap" style={{ marginTop: 14 }}><Tag s={st} /><span className="muted">{p.name} ({p.role.toLowerCase()}) · {B.name}, {B.city} · <b style={{ color: "var(--ink)" }}>{fmt(c.amount)}</b></span></div>
           </div>
           <div className="row">
             <button className="btn gray" disabled={mine} onClick={() => A.reset(c.id)}>Reset</button>

@@ -1,73 +1,73 @@
 import { useEffect, useState } from "react";
+import { SURCHARGES } from "../data";
 import { api } from "../api";
-import { Flag, Head } from "../lib";
+import { Head } from "../lib";
 
-const LABELS = { reviewer: "Events", lender: "Events", owner: "Events" };
-
-const DOUBLE_CHARGE_SQL = `SELECT * FROM surcharge_registry
-WHERE property_id = $1 AND lower(work) = lower($2)
-  AND ends >= CURRENT_DATE;`;
-const WEEKLY_SQL = `CREATE MATERIALIZED VIEW history_weekly
-WITH (timescaledb.continuous) AS
-SELECT time_bucket('1 week', at) AS week,
-       persona, count(*) AS events, sum(paid), sum(held)
-FROM history_events GROUP BY week, persona;`;
+const VIEWS = [["all", "Activity"], ["flagged", "Flags"], ["registry", "Surcharge registry"]];
+const OUTCOMES = { done: "Passed", fail: "Flagged", warn: "Needs attention" };
 
 export default function History({ S, A }) {
+  const [view, setView] = useState("all");
+  const [query, setQuery] = useState("");
   const [history, setHistory] = useState(null);
-  useEffect(() => { let active = true; api.history(S.persona).then(v => { if (active) setHistory(v); }).catch(() => { if (active) setHistory(null); }); return () => { active = false; }; }, [S.persona, S.log.length]);
-  const weekly = [...(history?.weekly || [])].reverse();
-  const data = weekly.map(w => Number(w.events));
-  const max = Math.max(...data, 1);
-  const lab = LABELS[S.persona];
-  const stats = [["Events stored", history?.connected ? history.events.toLocaleString() : "—", "documents, checks, decisions"], ["Active surcharges", history?.connected ? history.surcharges.filter(s => new Date(s.ends) >= new Date()).length : "—", "registry records"], ["Weekly buckets", history?.connected ? weekly.length : "—", "continuous aggregate"]];
+  useEffect(() => {
+    let active = true;
+    api.history(S.persona).then(data => { if (active) setHistory(data); }).catch(() => { if (active) setHistory(null); });
+    return () => { active = false; };
+  }, [S.persona, S.log.length]);
+  const ids = new Set(S.all.map(claim => claim.id));
+  const events = history?.connected ? history.recent.map(event => ({
+    t: new Date(event.at).toLocaleString(),
+    id: ids.has(event.claim_id) ? event.claim_id : null,
+    text: `${event.claim_id} · ${event.detail?.text || event.kind.replaceAll("_", " ")}`,
+    who: event.detail?.worker || "Tiger Cloud",
+    ok: event.detail?.result || (event.kind === "surcharge_checked" && event.detail?.active_count ? "warn" : "done"),
+  })) : S.log.map(event => {
+    const id = event.text.split(" · ", 1)[0];
+    return { ...event, id: ids.has(id) ? id : null };
+  });
+  const flags = events.filter(event => event.ok === "fail" || event.ok === "warn");
+  const registry = view === "registry";
+  const search = query.trim().toLowerCase();
+  const surchargeRows = history?.connected ? history.surcharges.map(s => ({ ...s, per_unit: `$${Number(s.per_unit).toFixed(2)}` })) : SURCHARGES;
+  const rows = (registry ? surchargeRows : view === "flagged" ? flags : events).filter(row => (
+    (registry ? [row.building, row.property_id, row.work] : [row.text, row.who, OUTCOMES[row.ok]])
+      .some(value => value?.toLowerCase().includes(search))
+  ));
+  const counts = { all: events.length, flagged: flags.length, registry: surchargeRows.length };
+
   return (
-    <div className="wrapx">
-      <Head over="Tiger Data · time-series history" title="History" lede="Every document, check, payment and rent surcharge is stored as a time-stamped event. That's how Plumbline knows when the same work is charged twice." />
-      <div className="grid g4">
-        {stats.map(([l, v, d]) => <div className="tile" key={l}><div className="over">{l}</div><div className="stat num" style={{ fontSize: 34 }}>{v}</div><div className="muted small" style={{ marginTop: 8 }}>{d}</div></div>)}
+    <div className="wrapx history">
+      <Head title="History" lede="Find a past check, follow a flag, or look up a registered surcharge." />
+      <div className="history-toolbar">
+        <div className="history-filters" role="group" aria-label="History view">
+          {VIEWS.map(([key, label]) => <button type="button" key={key} aria-pressed={view === key} onClick={() => { setView(key); setQuery(""); }}>{label} <span>{counts[key]}</span></button>)}
+        </div>
+        <input type="search" aria-label={registry ? "Search registry" : "Search activity"} placeholder={registry ? "Search buildings or work" : "Search claims or checks"} value={query} onChange={event => setQuery(event.target.value)} />
       </div>
-      <section className="grid g32">
-        <div className="tile">
-          <div className="row between"><h4>{lab} stored per week</h4></div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 14, height: 220, marginTop: 24, paddingBottom: 26 }}>
-            {data.map((d, i) => (
-              <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "flex-end", height: "100%", position: "relative" }}>
-                <div style={{ height: (d / max) * 100 + "%", background: "#000", borderRadius: "6px 6px 0 0" }} />
-                <span className="small muted" style={{ position: "absolute", bottom: -24, left: 0, right: 0, textAlign: "center" }}>{new Date(weekly[i].week).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
-              </div>
-            ))}
-          </div>
-          <p className="muted small">{history?.connected ? "Measured from stored events." : "Connect Tiger Cloud to show live history."}</p>
-        </div>
-        <div className="tile">
-          <h4>The double-charge check</h4>
-          <pre className="json" style={{ marginTop: 12 }}>{DOUBLE_CHARGE_SQL}</pre>
-          <p className="muted small" style={{ lineHeight: 1.5 }}>Checks active surcharges for the same property and type of work. Claims still require a reviewer to decide.</p>
-          <button className="btn black sm" onClick={() => { A.setPersona("reviewer"); A.go("claims"); }}>Try it on Vermont Gardens</button>
-        </div>
-      </section>
-      <div className="tbl"><table>
-        <thead><tr><th>Building</th><th>Work</th><th>Approved</th><th>Ends</th><th>Per unit / month</th></tr></thead>
-        <tbody>
-          {(history?.surcharges || []).map(s => (
-            <tr key={s.property_id + s.work} className={s.work === "Roof" ? "bad" : ""}>
-              <td><b>{s.building}</b> <span className="mono muted small">{s.property_id}</span></td>
-              <td>{s.work}</td><td>{s.approved}</td><td>{s.ends}</td><td className="num">${Number(s.per_unit).toFixed(2)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table></div>
-      <section className="grid g2">
-        <div className="tile"><h4>How the weekly chart is stored</h4><pre className="json" style={{ marginTop: 12 }}>{WEEKLY_SQL}</pre></div>
-        <div className="tile">
-          <h4>Live events</h4>
-          <div className="term" style={{ marginTop: 12, maxHeight: 220 }}>
-            {!history?.recent?.length ? <span className="g">No stored events yet.</span> : history.recent.map((event, k) => <div key={k}><span className="g">{event.kind}</span> {event.claim_id} · {event.detail?.text || event.detail?.status || event.detail?.action || "recorded"}</div>)}
-          </div>
-        </div>
-      </section>
-      <Flag t={history?.connected ? "Tiger Cloud history" : "Tiger Cloud connection required"} />
+      {rows.length > 0 ? <div className="history-results" key={view}>
+        {registry ? <div className="tbl"><table>
+          <thead><tr><th scope="col">Building</th><th scope="col">Work</th><th scope="col">Approved</th><th scope="col">Ends</th><th scope="col">Per unit / month</th></tr></thead>
+          <tbody>{rows.map(s => <tr key={s.property_id + s.work}>
+            <td><b>{s.building}</b><br /><span className="mono muted small">{s.property_id}</span></td>
+            <td>{s.work}</td><td>{s.approved}</td><td>{s.ends}</td><td className="num">{s.per_unit}</td>
+          </tr>)}</tbody>
+        </table></div> : <ul className="history-events">{rows.map((event, index) => (
+          <li key={event.t + event.text + index}>
+            <time className="mono">{event.t}</time>
+            <div>{event.id ? <a href={`#/claim/${event.id}`}>{event.text.slice(event.id.length + 3)} <span aria-hidden="true">↗</span></a> : event.text}
+              <small>{event.who}{event.id && " · " + event.id}</small></div>
+            <span className={event.ok === "done" ? "muted" : "history-flag"}>{OUTCOMES[event.ok] ?? "Event"}</span>
+          </li>
+        ))}</ul>}
+      </div> : <div className="history-empty">
+        <p>{search ? "No matching records." : registry ? "No surcharges in the registry." : view === "flagged" ? "No flags in recent activity." : "Run a claim check to see its activity here."}</p>
+        {search ? <button className="btn white sm" onClick={() => setQuery("")}>Clear search</button> : !registry && <a className="btn white sm" href="#/claims">Open claims</a>}
+      </div>}
+      {registry && <div className="history-note">
+        <p className="muted small">{history?.connected ? "Tiger Cloud surcharge registry" : "Sample surcharge registry · connect Tiger Cloud for live records"}</p>
+        <button className="btn white sm" onClick={() => { A.setPersona("reviewer"); A.go("claims"); }}>Open rent applications</button>
+      </div>}
     </div>
   );
 }

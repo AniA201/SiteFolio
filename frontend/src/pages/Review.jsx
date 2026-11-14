@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { BUILDINGS, PARTIES } from "../data";
+import { BUILDINGS, PARTIES, partyOf } from "../data";
 import { COL, Head, NEEDS, Tag, money } from "../lib";
+import EvidenceFolio from "../components/EvidenceFolio";
 
 const APPROVE_LABEL = {
   owner: c => c.outcome.status === "blocked" ? "Confirm block" : `Approve: pay ${money(c.outcome.a[1])}, hold ${money(c.outcome.b[1])}`,
@@ -24,35 +25,26 @@ export default function Review({ S, A }) {
         </div>
       )}
       {cur && (
-        <div className="grid g12" style={{ alignItems: "start" }}>
-          <div className="tbl">
+        <div className="grid g12 review-layout">
+          <div className="review-queue">
             {cases.map(c => (
-              <div key={c.id} onClick={() => setSel(c.id)} style={{ padding: "16px 18px", borderTop: "1px solid var(--g2)", cursor: "pointer", background: c.id === cur.id ? "var(--g1)" : "#fff" }}>
+              <button type="button" className="review-item" key={c.id} aria-pressed={c.id === cur.id} onClick={() => setSel(c.id)}>
                 <div className="row between"><span className="mono small muted">{c.id}</span><Tag s={S.review[c.id] || S.status[c.id]} /></div>
-                <div style={{ fontWeight: 600, marginTop: 6 }}>{PARTIES[c.party].name}</div>
+                <div style={{ fontWeight: 600, marginTop: 6 }}>{partyOf(c).name}</div>
                 <div className="row between"><span className="small muted">{c.title}</span><span className="num" style={{ fontWeight: 700, color: COL[c.outcome.b[2]] }}>{money(c.outcome.b[1])}</span></div>
-              </div>
+              </button>
             ))}
           </div>
           <div className="tile">
             <div className="row between">
               <div><div className="over">{cur.id} · {BUILDINGS[cur.b].name}</div><h2 className="h3" style={{ marginTop: 8 }}>{cur.title}</h2></div>
-              <a className="small" style={{ textDecoration: "underline" }} onClick={() => A.go("claim", cur.id)}>Full check →</a>
+              <a className="text-link" href={`#/claim/${cur.id}`}>Full check ↗</a>
             </div>
-            <div className="grid g2" style={{ marginTop: 18 }}>
-              <div className="tile w">
-                <div className="over">The paper says</div>
-                {cur.lines.map(l => <div key={l[0]} style={{ marginTop: 12 }}><div className="muted small">{l[0]}</div><div style={{ fontSize: 22, fontWeight: 600 }} className="num">{l[1]}</div></div>)}
-              </div>
-              <div className="tile dark">
-                <div className="over" style={{ color: "rgba(255,255,255,.6)" }}>The building says</div>
-                {cur.lines.map(l => <div key={l[0]} style={{ marginTop: 12 }}><div style={{ color: "rgba(255,255,255,.6)", fontSize: 13.5 }}>{l[0]}</div><div style={{ fontSize: 22, fontWeight: 600, color: l[3] === "bad" ? "var(--amber)" : "#fff" }} className="num">{l[2]}</div></div>)}
-              </div>
-            </div>
+            <EvidenceFolio key={cur.id} lines={cur.lines} />
             <p style={{ fontSize: 16, lineHeight: 1.55, marginTop: 18 }}>{cur.outcome.reason}</p>
             {cur.outcome.note && <>
               <div className="over" style={{ marginTop: 16 }}>Drafted message</div>
-              <textarea className="ta" rows={3} style={{ marginTop: 8, background: "#fff" }} value={msg[cur.id] ?? cur.outcome.note} onChange={e => setMsg({ ...msg, [cur.id]: e.target.value })} />
+              <textarea className="ta" rows={3} style={{ marginTop: 8, background: "var(--surface)" }} value={msg[cur.id] ?? cur.outcome.note} onChange={e => setMsg({ ...msg, [cur.id]: e.target.value })} />
             </>}
             <div className="row wrap" style={{ marginTop: 18 }}>
               {S.review[cur.id] ? <>

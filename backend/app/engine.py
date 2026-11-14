@@ -9,7 +9,9 @@ import copy
 from datetime import datetime
 
 from .fixtures import BUILDINGS, CLAIMS
+from .intake import EXTRA_BUILDINGS
 from .rules import build_judge_claim
+from .settings import settings
 
 STEP_DELAY = 0.55
 LOG_LIMIT = 60
@@ -50,6 +52,7 @@ class Engine:
         self.queue: list[str] = []
         self.current: str | None = None
         self.judge_n = 1
+        self.upload_n = 0
         self.rev = 0
 
     def find(self, cid: str) -> dict | None:
@@ -63,7 +66,7 @@ class Engine:
         return {
             "rev": self.rev, "claims": self.claims, "samples": list(self.samples.values()),
             "steps": self.steps, "status": self.status, "review": self.review, "retry": self.retry,
-            "log": self.log, "queue": self.queue, "current": self.current,
+            "log": self.log, "queue": self.queue, "current": self.current, "buildings_extra": EXTRA_BUILDINGS,
         }
 
     def _changed(self) -> None:
@@ -139,6 +142,17 @@ class Engine:
         self._changed()
         return sample["id"]
 
+    def next_upload_id(self) -> str:
+        self.upload_n = getattr(self, "upload_n", 0) + 1
+        return f"UPL-{self.upload_n:03d}"
+
+    def add_claim(self, claim: dict) -> str:
+        """Add a claim built from an uploaded document and queue the agent on it."""
+        self.claims.insert(0, claim)
+        self.queue.append(claim["id"])
+        self._changed()
+        return claim["id"]
+
     def judge(self, area: int, amount: int, bank: str, hidden: str) -> str:
         claim = build_judge_claim(area, amount, bank, hidden, self.judge_n)
         self.judge_n += 1
@@ -168,25 +182,52 @@ class Engine:
 
     async def _run_claim(self, cid: str) -> None:
         claim = self.find(cid)
+        if settings.agent_enabled and await self._run_with_agent(cid, claim):
+            return
+        await self._replay(cid, claim)
+
+    def _push_step(self, cid: str, claim: dict, step: list) -> None:
+        if len(step) > 3:  # map the data source to the claim's call record, so the step shows its source chip
+            idx = next((i for i, a in enumerate(claim["apis"]) if a["svc"] == step[3]), None)
+            step = step[:3] + ([idx] if idx is not None else [])
+        claim["steps"].append(step)
+        self.log.insert(0, {"t": datetime.now().strftime("%H:%M:%S"), "who": WHO[step[0]], "text": f"{cid} · {step[1]}", "ok": step[2]})
+        del self.log[LOG_LIMIT:]
+        self.steps[cid] = len(claim["steps"])
+        self._changed()
+
+    async def _run_with_agent(self, cid: str, claim: dict) -> bool:
+        """Run the real deep agent; on any failure restore the recorded plan and let the replay run instead."""
+        from .agent.runner import outcome_from, run_claim
+        loop = asyncio.get_running_loop()
+        recorded = claim["steps"]
+        claim["steps"] = []
+        try:
+            proposed = await asyncio.to_thread(run_claim, claim, lambda s: loop.call_soon_threadsafe(self._push_step, cid, claim, s))
+        except Exception as e:  # network, rate limit, model refusal: the demo keeps working
+            proposed, error = None, e
+        else:
+            error = None
+        await asyncio.sleep(0)  # let queued step callbacks land
+        if not proposed:
+            claim["steps"] = recorded
+            self.steps[cid] = 0
+            self.log.insert(0, {"t": datetime.now().strftime("%H:%M:%S"), "who": "Coordinator",
+                                "text": f"{cid} · Live agent unavailable ({type(error).__name__ if error else 'no decision'}); replaying the recorded plan", "ok": "warn"})
+            return False
+        claim["outcome"] = outcome_from(proposed, claim)
+        self._check_surcharge(cid, claim)
+        self.steps[cid] = len(claim["steps"])
+        self.status[cid] = claim["outcome"]["status"]
+        self.current = None
+        self._changed()
+        return True
+
+    async def _replay(self, cid: str, claim: dict) -> None:
         while self.current == cid:
             cur = self.steps.get(cid, 0)
             if cur >= len(claim["steps"]):
-                if self.history and self.history.enabled and claim["persona"] == "reviewer" and claim["kind"] == "rentdup":
-                    property_id = BUILDINGS[claim["b"]]["cs"]
-                    matches = self.history.active_surcharges(property_id, "roof")
-                    claim["history_check"] = {
-                        "property_id": property_id,
-                        "work": "roof",
-                        "active_count": len(matches),
-                        "source": "Tiger Cloud",
-                    }
-                    if matches:
-                        claim["outcome"]["status"] = "denied"
-                        claim["outcome"]["reason"] = "An active roof surcharge exists for this property. Review the registry record before approving another charge."
-                    else:
-                        claim["outcome"]["status"] = "blocked"
-                        claim["outcome"]["reason"] = "No active roof surcharge was found in Tiger Cloud. The sample duplicate-charge result is unverified; review the application and evidence manually."
-                    self.history.record(cid, "reviewer", "surcharge_checked", claim["history_check"])
+                self._check_surcharge(cid, claim)
                 self.status[cid] = claim["outcome"]["status"]
                 if self.history:
                     self.history.record(cid, claim["persona"], "check_completed", {"status": self.status[cid]})
@@ -203,3 +244,18 @@ class Engine:
                 self.history.record(cid, claim["persona"], "check_step",
                                     {"worker": who, "text": text, "result": res})
             self._changed()
+
+    def _check_surcharge(self, cid: str, claim: dict) -> None:
+        if not (self.history and self.history.enabled and claim["persona"] == "reviewer" and claim["kind"] == "rentdup"):
+            return
+        building = BUILDINGS.get(claim["b"]) or EXTRA_BUILDINGS.get(claim["b"])
+        property_id = building.get("cs") if building else None
+        matches = self.history.active_surcharges(property_id, "roof") if property_id else []
+        claim["history_check"] = {"property_id": property_id, "work": "roof", "active_count": len(matches), "source": "Tiger Cloud"}
+        if matches:
+            claim["outcome"]["status"] = "denied"
+            claim["outcome"]["reason"] = "An active roof surcharge exists for this property. Review its registry record before approving another charge."
+        else:
+            claim["outcome"]["status"] = "blocked"
+            claim["outcome"]["reason"] = "No active roof surcharge was found in Tiger Cloud. The duplicate-charge result is unverified; review the application manually."
+        self.history.record(cid, "reviewer", "surcharge_checked", claim["history_check"])
