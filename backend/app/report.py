@@ -34,6 +34,9 @@ def decision_record(c: dict, review: str | None) -> dict:
             "decision": {"status": o["status"], key(o["a"][0]): o["a"][1], key(o["b"][0]): o["b"][1], "reason": o["reason"]},
             "data_sources": sorted({a["svc"] for a in c["apis"]}),
             "approved_by": REVIEW.get(review, "waiting for a person"),
+            **({"solana": {k: c["solana"].get(k) for k in ("signature", "explorer", "signer", "pay", "hold", "sha256", "lender",
+                                                            "released", "release_signature")}}
+               if (c.get("solana") or {}).get("state") == "recorded" else {}),
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
 
 
@@ -63,6 +66,20 @@ def _aerial(B: dict) -> str:
     half = max(35, round((B["roof"] * 0.0929) ** 0.5 * 0.8))
     src = f"/api/data/vexcel/ortho.jpg?lat={B['lat']}&lon={B['lon']}&half_side_m={half}&pixels=900"
     return f'<img class="aerial" src="{e(src)}" alt="Aerial view of {e(B["name"])}"><div class="muted" style="font-size:12.5px">Vexcel orthophoto · {e(B.get("vexcel_collection") or "")}</div>'
+
+
+def _solana(c: dict) -> str:
+    sol = c.get("solana") or {}
+    if sol.get("state") != "recorded":
+        return ""
+    moved = (f"Paid {money(sol['pay'])}; held {money(sol['hold'])} in a holding account that needs both the lender's and "
+             f"Plumbline's signatures." if sol.get("moves") else "No money moved; the decision is recorded.")
+    release = (f" The held amount was released later: <a href='{e(sol['release_explorer'])}'>release transaction</a>."
+               if sol.get("released") else "")
+    return (f"<h2>Recorded on Solana (devnet)</h2><p>{e(moved)} Signed by {e(sol.get('signer'))}. "
+            f"<a href='{e(sol['explorer'])}'>View the transaction</a>.{release}</p>"
+            f"<p class=muted>Evidence fingerprint (SHA-256): <code>{e(sol.get('sha256'))}</code>. Anyone can recompute it from this "
+            f"evidence and compare it with the memo on chain.</p>")
 
 
 def render(c: dict, review: str | None, steps_done: int, audience: str = "full") -> str:
@@ -101,6 +118,7 @@ def render(c: dict, review: str | None, steps_done: int, audience: str = "full")
             f"<h2>Two sources must agree</h2><table><tr><th>Claim</th><th>Source 1</th><th>Source 2</th><th>The paper</th><th>Verdict</th></tr>{cross}</table>"
             f"<h2>Line by line</h2><table><tr><th>Line</th><th>The paper says</th><th>The building says</th></tr>{lines}</table>"
             f"{'<h2>From above</h2>' + _aerial(B) if _aerial(B) else ''}"
+            f"{_solana(c)}"
             f"<h2>Data calls</h2>{calls}"
             f"<h2>Audit log</h2><table><tr><th>#</th><th>Who</th><th>Step</th><th>Result</th></tr>{log}"
             f"{f'<tr><td>--</td><td>Person</td><td>Decision recorded</td><td>{e(REVIEW[review])}</td></tr>' if review else ''}</table>"

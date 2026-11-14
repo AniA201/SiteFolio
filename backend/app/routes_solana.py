@@ -10,6 +10,7 @@ import base64
 import copy
 import os
 import threading
+import time
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -55,8 +56,10 @@ def _record(engine, claim: dict, action: str, signature: str, info: dict, signer
         claim["solana"].update(released=True, release_signature=signature, release_explorer=L.explorer("tx", signature),
                                release_sha256=info["sha256"], release_amount=info["amount"])
     else:
+        info = dict(info)
+        claim["sealed_files"] = info.pop("sealed", None) or {}
         claim["solana"] = {"state": "recorded", "signature": signature, "explorer": L.explorer("tx", signature),
-                           "signer": signer, **info}
+                           "signer": signer, "at": time.strftime("%Y-%m-%d %H:%M"), **info}
     _changed(engine)
 
 

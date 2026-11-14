@@ -119,6 +119,9 @@ money with both signatures and a new receipt. Blocks, rejections and rent decisi
 Setup (free, devnet only): the app wallet is created at `backend/app/data/solana/app_wallet.json` (gitignored) on first
 use; fund its address with devnet SOL at https://faucet.solana.com (`GET /api/solana/status` shows the address and
 balance). Phantom needs no SOL: the app pays the fees. Set `PLUMBLINE_SOLANA=off` to turn it off.
+Live check of the whole flow on devnet, with a test key standing in for Phantom: `cd backend && .venv/bin/python -m scripts.solana_smoke`.
+Evidence is sealed at approval, so notes the agent writes after it resumes never break Verify; an edited evidence file does.
+Approved decisions can't be undone in Review once they're on Solana, and the exported report and `decision.json` carry the receipt.
 
 ## Open-source credits
 - Agent: [deepagents](https://github.com/langchain-ai/deepagents), LangChain, LangGraph; tracing in LangSmith (free tier).

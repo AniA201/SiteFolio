@@ -88,3 +88,23 @@ def test_approving_without_solana_still_records_the_decision():
         t = client.post("/api/solana/claims/CLM-2207/tamper").json()
         assert t["tampered"] is True
         assert client.post("/api/solana/claims/CLM-2207/tamper").json()["tampered"] is False
+
+
+def test_sealed_evidence_ignores_notes_written_after_approval():
+    c = claim("CLM-2207")
+    c["evidence_files"] = {"/evidence/CLM-2207/plan.md": "plan"}
+    c["sealed_files"] = dict(c["evidence_files"])
+    signed = L.fingerprint(c, sorted(c["sealed_files"]))
+    c["evidence_files"]["/evidence/CLM-2207/plan.md"] = "the agent rewrote its notes after resuming"
+    assert L.fingerprint(c, sorted(c["sealed_files"])) == signed
+    c["sealed_files"]["/evidence/CLM-2207/plan.md"] = "someone edited the sealed evidence"
+    assert L.fingerprint(c, sorted(c["sealed_files"])) != signed
+
+
+def test_report_and_decision_record_include_the_solana_receipt():
+    from app.report import decision_record, render
+    c = claim("DRW-0412")
+    c["solana"] = {"state": "recorded", "signature": "abc", "explorer": "https://explorer.solana.com/tx/abc?cluster=devnet",
+                   "signer": "Phantom", "pay": 1.0, "hold": 2.0, "moves": True, "sha256": "f" * 64}
+    assert "Recorded on Solana" in render(c, "ok", len(c["steps"]))
+    assert decision_record(c, "ok")["solana"]["signer"] == "Phantom"

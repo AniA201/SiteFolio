@@ -133,6 +133,7 @@ def reset(cid: str):
     claim = _claim_or_404(cid)
     if engine.current != cid:
         claim.pop("solana", None)  # the chain keeps its receipt; the demo starts the claim fresh
+        claim.pop("sealed_files", None)
         if "untampered_lines" in claim:
             claim["lines"] = claim.pop("untampered_lines")
     engine.reset(cid)

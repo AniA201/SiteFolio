@@ -216,6 +216,7 @@ function EvidenceTab({ S, c, step, done }) {
     checks: c.cross.map(x => ({ claim: x[0], verdict: x[4] })),
     decision: { status: o.status, [snake(o.a[0])]: o.a[1], [snake(o.b[0])]: o.b[1] },
     approved_by: S.review[c.id] || "waiting",
+    ...(c.solana?.state === "recorded" ? { solana: { transaction: c.solana.signature, signer: c.solana.signer, evidence_sha256: c.solana.sha256, released: !!c.solana.released } } : {}),
   };
   return (
     <section className="grid g12">

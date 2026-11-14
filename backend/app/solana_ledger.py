@@ -96,7 +96,8 @@ def _client() -> Client:
 # ---------- evidence fingerprint ----------
 def evidence_payload(claim: dict, files: list[str] | None = None) -> dict:
     """What the decision rests on: the checked lines, the data sources, the outcome and the agent's evidence files."""
-    ev = claim.get("evidence_files") or {}
+    # Files are sealed at approval (the agent keeps writing notes after it resumes); the sealed copy is what was signed.
+    ev = claim.get("sealed_files") or claim.get("evidence_files") or {}
     names = sorted(ev) if files is None else files
     o = claim["outcome"]
     return {"claim": claim["id"], "lines": claim.get("lines"), "apis": claim.get("apis"),
@@ -274,10 +275,11 @@ def _memo(text: str, signer: Pubkey):
 def _decision_ixs(c: Client, s: dict, claim: dict, decision: str, lender: Pubkey) -> tuple[list, dict]:
     app, mint = app_wallet(), Pubkey.from_string(s["mint"])
     p = plan(claim, decision)
-    files = sorted(claim.get("evidence_files") or {})
-    digest = fingerprint(claim, files)
+    sealed = dict(claim.get("sealed_files") or claim.get("evidence_files") or {})
+    files = sorted(sealed)
+    digest = fingerprint({**claim, "sealed_files": sealed}, files)
     ixs = []
-    info = {**p, "sha256": digest, "files": files, "lender": str(lender)}
+    info = {**p, "sha256": digest, "files": files, "lender": str(lender), "sealed": sealed}
     if p["moves"]:
         payee = _payee(s, claim)
         _, vault = _vault(c, s, lender)

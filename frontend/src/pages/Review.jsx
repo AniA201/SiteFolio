@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BUILDINGS, PARTIES, partyOf } from "../data";
 import { COL, Head, NEEDS, Tag, money } from "../lib";
 import EvidenceFolio from "../components/EvidenceFolio";
 import SolanaPanel from "../components/SolanaPanel";
-import { connectPhantom, disconnectPhantom, hasPhantom, signOnSolana } from "../solana";
+import { connectPhantom, disconnectPhantom, hasPhantom, signOnSolana, solanaStatus } from "../solana";
 
 const APPROVE_LABEL = {
   owner: c => c.outcome.status === "blocked" ? "Confirm block" : `Approve: pay ${money(c.outcome.a[1])}, hold ${money(c.outcome.b[1])}`,
@@ -27,6 +27,8 @@ export default function Review({ S, A }) {
     catch (e) { setSolErr(e.message || String(e)); }
     finally { setSigning(""); }
   };
+  const [chain, setChain] = useState(null);
+  useEffect(() => { solanaStatus().then(setChain).catch(() => setChain({ ready: false })); }, []);
   const connect = async () => { setSolErr(""); try { setWallet(await connectPhantom()); } catch (e) { setSolErr(e.message); } };
   const walletBox = (
     <div className="sol-wallet">
@@ -34,6 +36,10 @@ export default function Review({ S, A }) {
         <span className="tag t-paid"><i />Phantom · {wallet.slice(0, 4)}…{wallet.slice(-4)} · devnet</span>
         <button className="btn white sm" onClick={() => { disconnectPhantom(); setWallet(null); }}>Disconnect</button>
       </> : <button className="btn gray sm" onClick={connect} title={hasPhantom() ? "" : "Install Phantom and switch it to Devnet"}>Connect Phantom to sign</button>}
+      {chain && (chain.ready
+        ? <a className="text-link small" href={chain.explorer_wallet} target="_blank" rel="noopener" title={`App wallet ${chain.app_wallet} · ${chain.sol} SOL (devnet test SOL, pays the fees)`}>All receipts on Solana ↗</a>
+        : <a className="text-link small" style={{ color: "var(--red)" }} href="https://faucet.solana.com" target="_blank" rel="noopener"
+            title={chain.app_wallet ? `Fund ${chain.app_wallet} on Devnet` : ""}>Solana wallet needs free devnet SOL ↗</a>)}
     </div>
   );
   const cur = cases.find(c => c.id === sel) || cases[0];
@@ -73,7 +79,9 @@ export default function Review({ S, A }) {
               {S.review[cur.id] ? <>
                 <Tag s={S.review[cur.id]} />
                 <span className="muted small">Recorded. The agent resumed and logged it.</span>
-                <button className="btn white sm" onClick={() => A.decide(cur.id, null)}>Undo</button>
+                {cur.solana?.state === "recorded" || cur.solana?.state === "pending"
+                  ? <span className="muted small">Permanent: it's on Solana.</span>
+                  : <button className="btn white sm" onClick={() => A.decide(cur.id, null)}>Undo</button>}
               </> : <>
                 <button className="btn black sm" disabled={!!signing} onClick={() => decide(cur.id, "ok")}>{signing === cur.id ? "Sign in Phantom…" : APPROVE_LABEL[cur.persona](cur)}</button>
                 {cur.outcome.note && <button className="btn amber sm" disabled={!!signing} onClick={() => decide(cur.id, "sent")}>Send message</button>}
