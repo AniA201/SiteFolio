@@ -9,6 +9,20 @@ const DECISION_BG = s => ["blocked", "denied"].includes(s) ? "#FDF0F1" : s === "
 const fileName = svc => svc.toLowerCase().replace(" ", "_") + ".json";
 const snake = s => s.toLowerCase().replace(/ /g, "_");
 
+// The real Vexcel orthophoto around the building, served by the backend (key stays server-side).
+function RealAerial({ B, show }) {
+  const [failed, setFailed] = useState(false);
+  const half = Math.max(35, Math.round(Math.sqrt(B.roof * 0.0929) * 0.8));
+  const src = `/api/data/vexcel/ortho.jpg?lat=${B.lat}&lon=${B.lon}&half_side_m=${half}&pixels=900`;
+  if (failed) return <Aerial b={B.id} kind="roof" show={show} />;
+  return (
+    <div style={{ position: "relative", aspectRatio: "1 / 1", background: "#4E5A47" }}>
+      <img src={src} alt={`Aerial view of ${B.name}`} onError={() => setFailed(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", filter: show ? "none" : "grayscale(1) brightness(.8)" }} />
+      {show && <span className="tag" style={{ position: "absolute", left: 10, bottom: 10, background: "#0A0A0A", color: "#FFAA00", fontFamily: "var(--mono)" }}>{B.roof.toLocaleString()} sq ft footprint · {B.ac} AC units</span>}
+    </div>
+  );
+}
+
 function RulesBox({ c, done }) {
   const o = c.outcome;
   if (c.persona === "reviewer") return (
@@ -102,12 +116,13 @@ function RunTab({ S, A, c, step, done, mine, reached, setTab }) {
         {vi >= 0 && (
           <div className="tile" style={{ opacity: reached(vi) ? 1 : .45 }}>
             <div className="row between"><h4>From above</h4><SvcChip s="Vexcel" /></div>
-            <div className="ph" style={{ marginTop: 14 }}><Aerial b={c.b} kind={aerialKind(c)} show={reached(vi)} /></div>
+            <div className="ph" style={{ marginTop: 14 }}>{B.real && B.lat ? <RealAerial B={B} show={reached(vi)} /> : <Aerial b={c.b} kind={aerialKind(c)} show={reached(vi)} />}</div>
             {c.claim && reached(vi) && MEASURED_KINDS.includes(c.kind) && <>
               <div className="cmp"><span className="muted">Claimed</span><div className="meter"><i style={{ width: "100%", background: "var(--g3)" }} /></div><span className="num r">{c.claim.toLocaleString()}</span></div>
               <div className="cmp"><span className="muted">Measured</span><div className="meter"><i style={{ width: Math.min(100, c.measured / c.claim * 100) + "%", background: c.measured / c.claim < .95 ? "var(--amber)" : "var(--green)" }} /></div><span className="num r" style={{ fontWeight: 700 }}>{c.measured.toLocaleString()}</span></div>
             </>}
-            <div className="muted small" style={{ marginTop: 10 }}>Illustration · roof outline measured on a Vultr GPU</div>
+            {c.roof_formula && reached(vi) && <div className="receipt" style={{ background: "#fff" }}>{c.roof_formula}</div>}
+            <div className="muted small" style={{ marginTop: 10 }}>{B.real ? `Vexcel ortho, ${B.vexcel_collection} · roof ${B.pitch.toLowerCase()}${B.roof_material ? ", " + B.roof_material : ""} · ${B.ac} rooftop units counted` : "Illustration · roof outline measured on a Vultr GPU"}</div>
           </div>
         )}
         {mi >= 0 && (

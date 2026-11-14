@@ -5,8 +5,8 @@ const ROOF_OUTLINE = "70,50 300,50 300,120 250,120 250,190 70,190";
 const TREES = [[30, 28], [24, 196], [372, 226], [14, 116], [44, 120]];
 
 export function Aerial({ b, kind, show, big }) {
-  const B = BUILDINGS[b] || BUILDINGS.wc;
-  const units = kind === "hvac" ? 8 : B.ac;
+  const B = BUILDINGS[b] || BUILDINGS.wc || Object.values(BUILDINGS)[0];
+  const units = Math.min(B.ac || 0, 8);
   const hiUnits = kind === "hvac" && show;
   const outline = kind === "roof" || kind === "footprint";
   return (
@@ -24,7 +24,7 @@ export function Aerial({ b, kind, show, big }) {
       {show && !big && (outline || kind === "hvac") && (
         <g>
           <rect x="80" y="102" width="160" height="24" rx="12" fill="#0A0A0A" />
-          <text x="160" y="118" textAnchor="middle" fill="#FFAA00" fontSize="11.5" fontFamily="ui-monospace,monospace">{kind === "hvac" ? "8 units detected" : B.roof.toLocaleString() + " sq ft footprint"}</text>
+          <text x="160" y="118" textAnchor="middle" fill="#FFAA00" fontSize="11.5" fontFamily="ui-monospace,monospace">{kind === "hvac" ? `${B.ac} units detected` : B.roof.toLocaleString() + " sq ft footprint"}</text>
         </g>
       )}
     </svg>

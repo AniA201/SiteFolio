@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .engine import Engine
-from .fixtures import BUILDINGS, PARTIES, PERSONAS, SURCHARGES
+from .fixtures import BUILDINGS, META, PARTIES, PERSONAS, SURCHARGES, USING_REAL
 from .routes_data import router as data_router
 from .settings import settings
 
@@ -67,7 +67,8 @@ def health():
 
 @app.get("/api/meta")
 def meta():
-    return {"buildings": BUILDINGS, "parties": PARTIES, "personas": PERSONAS, "surcharges": SURCHARGES}
+    return {"buildings": BUILDINGS, "parties": PARTIES, "personas": PERSONAS, "surcharges": SURCHARGES,
+            "meta": META, "real": USING_REAL}
 
 
 @app.get("/api/state")

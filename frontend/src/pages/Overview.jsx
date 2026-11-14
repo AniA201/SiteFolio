@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { PARTIES, PERSONAS } from "../data";
+import { META, PARTIES, PERSONAS } from "../data";
 import { COL, FINAL, NEEDS, SvcChip, Tag, fmt, money, sumNum } from "../lib";
 import { Aerial, FloorPlan } from "../components/Illustrations";
 
@@ -50,7 +50,7 @@ function statTiles(persona, done, waiting, status) {
 export default function Overview({ S, A }) {
   const { list, status, persona } = S;
   const [slide, setSlide] = useState(0);
-  const stories = STORIES[persona];
+  const stories = (META.stories || STORIES)[persona];
   const at = slide % stories.length;
   const [title, text, claimId, building] = stories[at];
   const done = list.filter(c => FINAL.includes(status[c.id]));
