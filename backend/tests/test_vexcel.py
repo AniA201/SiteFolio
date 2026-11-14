@@ -91,3 +91,26 @@ def test_rate_limit_retried_with_backoff():
     c = VexcelClient("k", http=httpx.Client(transport=httpx.MockTransport(handler)), sleep=slept.append)
     assert c.property(29.85, -95.53).primary.ac_units == 26
     assert len(calls) == 3 and len(slept) == 2 and 1 <= slept[0] < 2 and 2 <= slept[1] < 3
+
+
+def test_geometry_wkt_from_geojson():
+    from app.integrations.vexcel import geometry_wkt
+    poly = {"type": "MultiPolygon", "coordinates": [[[[-95.1, 29.1], [-95.0, 29.1], [-95.0, 29.2], [-95.1, 29.1]]]]}
+    assert geometry_wkt(poly) == "POLYGON((-95.1 29.1,-95.0 29.1,-95.0 29.2,-95.1 29.1))"
+
+
+def test_detect_counts_per_view():
+    from app.integrations.vexcel import count_by_view, detect
+    seen = []
+
+    def handler(req):
+        seen.append(json.loads(req.content))
+        return httpx.Response(200, json={"images": [{"image-id": "a"}, {"image-id": "b"}], "features": [{"properties": {
+            "label": "rooftop air conditioning unit",
+            "detections": [{"imageId": "a", "confidence": .9}, {"imageId": "b", "confidence": .8}, {"imageId": "b", "confidence": .7}]}}]})
+    c = VexcelClient("k", http=httpx.Client(transport=httpx.MockTransport(handler)))
+    dets = detect(c, "POLYGON((0 0,1 0,1 1,0 0))", ["rooftop air conditioning unit"], ["oblique-north", "oblique-south"])
+    assert count_by_view(dets, ["oblique-north", "oblique-south"]) == {"oblique-north": 1, "oblique-south": 2}
+    body = seen[0]
+    assert body["images"][0]["endpoint"] == "oriented/extract" and body["images"][0]["request"]["layer"] == "urban"
+    assert body["model-input"]["elements"][0]["model"] == "sam3"

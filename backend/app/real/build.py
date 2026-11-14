@@ -41,6 +41,7 @@ class Facts:
         feats = d["vexcel_property"].get("features") or []
         self.vx_attrs = feats[0]["properties"] if feats else {}
         self.vx = parse_property(self.vx_attrs)
+        self.ac_views = d.get("ac_views")
         self.models = {mid: {"name": m["basics"]["name"], "basics": m["basics"], "rooms": parse_rooms(m["rooms"]), "raw_rooms": m["rooms"]}
                        for mid, m in d["matterport"].items()}
 
@@ -83,6 +84,14 @@ class Facts:
         return {"svc": "Vexcel", "who": "roof", "title": title,
                 "req": f"GET /v2/property/extract\n  ?wkt=POINT({self.rec['lon']} {self.rec['lat']})\n  &srid=4326&latest=true\n  &include=precomputed\n  &unit-system=imperial",
                 "resp": J(resp)}
+
+    def call_vexcel_detect(self) -> dict:
+        v = self.ac_views
+        views = list(v["counts"])
+        req = ("POST /v2/elements/detect\n{\n  wkt: <parcel polygon>, srid: 4326,\n  images: [" + ", ".join(views) + "],\n"
+               f"  model-input: {{ elements: [{{ label: \"{v['label']}\",\n    model: \"{v['model']}\", detection-threshold: {v['threshold']} }}] }}\n}}")
+        return {"svc": "Vexcel", "who": "roof", "title": "Count again from angled views", "req": req,
+                "resp": J({"detections_per_view": v["counts"], "label": v["label"]})}
 
     def call_matterport(self, mids: list[str], note: str = "") -> dict:
         out = []
@@ -151,18 +160,23 @@ def owner_claims(v: Facts) -> list[dict]:
     out.append({"id": "CLM-2214", "persona": "owner", "party": "pam", "b": "vine", "date": "Nov 12", "title": "Rooftop AC replacement",
         "amount": amount, "kind": "hvac", "claim": claim_units, "measured": ac,
         "apis": [ai("polar_air_hvac.pdf", {"vendor": "Polar Air Mechanical", "items": [{"work": "Replace rooftop AC units", "qty": claim_units, "unit": "units", "amount": amount}], "pay_to": "••7730"}),
-                 v.call_vexcel("Count units from above"), v.call_costar(),
+                 v.call_vexcel("Count units from above"), *([v.call_vexcel_detect()] if v.ac_views else [v.call_costar()]),
                  tiger("SELECT approved_acct FROM vendors\nWHERE vendor='Polar Air'", {"approved_acct": "••7730", "account_matches": True, "duplicate": False})],
         "steps": [["coordinator", "Read the bill and write the plan", "done", 0], ["roof", "Count rooftop units from above", "done", 1],
-                  ["records", "Check the building size for a sanity range", "done", 2],
+                  (["roof", "Count again from two angled (oblique) views", "done", 2] if v.ac_views else
+                   ["records", "Check the building size for a sanity range", "done", 2]),
                   ["roof", f"Compare with bill: {claim_units} units claimed", "fail"],
                   ["records", "Check bank account and past payments", "done", 3], ["coordinator", "Plan updated: pause for manager", "warn"],
                   ["rules", f"Math: pay {usd(split.pay)} for {ac} units, hold {usd(split.hold)}", "warn"]],
-        "cross": [["AC units", f"Vexcel roof objects: {ac} units on the roof", f"CoStar: {n0(B['size'])} sq ft office, about 1 unit per {n0(B['size'] / ac)} sq ft",
-                   f"Bill: {claim_units} units", f"The aerial count is {ac}. The bill claims {claim_units - ac} more."]],
+        "cross": [["AC units", f"Vexcel top-down: {ac} units on the roof",
+                   (" · ".join(f"{k.split('-')[1]}: {n}" for k, n in v.ac_views["counts"].items()).join(("Vexcel angled views: ", " units")) if v.ac_views
+                    else f"CoStar: {n0(B['size'])} sq ft office, about 1 unit per {n0(B['size'] / ac)} sq ft"),
+                   f"Bill: {claim_units} units",
+                   (f"Two separate views agree on about {ac}. The bill claims {claim_units - ac} more." if v.ac_views
+                    else f"The aerial count is {ac}. The bill claims {claim_units - ac} more.")]],
         "lines": [["Units", str(claim_units), str(ac), "bad"], ["Amount", usd(amount), usd(split.pay), "bad"], ["Pay to", "••7730", "••7730 approved", "ok"]],
         "outcome": {"status": "partial", "a": ["Pay now", split.pay, "green"], "b": ["Hold", split.hold, "amber"],
-                    "reason": f"The aerial count shows {ac} rooftop units at {B['name']}, not {claim_units}. Paying for {ac} and holding the rest.",
+                    "reason": f"The straight-down and angled aerial views both show about {ac} rooftop units at {B['name']}, not {claim_units}. Paying for {ac} and holding the rest.",
                     "note": f"Hi Polar Air, the aerial survey counts {ac} rooftop units at {B['name']}. We've paid for {ac}. Can you share serial numbers for the other {claim_units - ac}?"}})
 
     # Fake bank change.
@@ -307,7 +321,7 @@ def stories(claims: dict, b: dict) -> dict:
     r, ac, rso, drw = c["CLM-2207"], c["CLM-2214"], c["RSO-3104"], c["DRW-0412"]
     return {
         "owner": [["The roof that shrank", f"A roofer billed {n0(r['claim'])} sq ft at {b['vine']['name']}. The building record and the aerial survey both say about {n0(r['measured'])}.", "CLM-2207", "vine"],
-                  [f"{ac['claim']} units billed, {ac['measured']} on the roof", f"The aerial survey counts {ac['measured']} rooftop AC units. The bill says {ac['claim']}.", "CLM-2214", "vine"],
+                  [f"{ac['claim']} units billed, {ac['measured']} on the roof", f"The straight-down and angled aerial views both count about {ac['measured']} rooftop AC units. The bill says {ac['claim']}.", "CLM-2214", "vine"],
                   ["\"We changed banks.\"", "A bill asked to pay a new account. Plumbline paid $0 and opened a review.", "CLM-2223", "vine"]],
         "reviewer": [["Rent up for a roof a third smaller", f"A landlord claimed {n0(rso['claim'])} sq ft of roof at {b['cochran']['name']}. The building has {n0(rso['measured'])}. Tenants would overpay for 5 years.", "RSO-3104", "cochran"],
                      ["The same roof, charged twice", f"Tenants at {b['westmoreland']['name']} already pay for this roof until 2029. The history check catches it.", "RSO-3104", "westmoreland"]],
