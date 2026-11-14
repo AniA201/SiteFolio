@@ -21,6 +21,18 @@ class Engine:
     def __init__(self, history=None) -> None:
         self.history = history
         self.reset_all()
+        if history and history.enabled:
+            for row in history.load_claims():
+                claim = row["claim"]
+                if not self.find(claim["id"]):
+                    self.claims.append(claim)
+                    self.samples.pop(claim["id"], None)
+                self.status[claim["id"]] = "ready" if row["status"] == "running" else row["status"]
+                self.steps[claim["id"]] = row["steps"]
+                if row["review"]:
+                    self.review[claim["id"]] = row["review"]
+                if row["retry"]:
+                    self.retry[claim["id"]] = True
         self._subs: set[asyncio.Queue] = set()
         self._wake = asyncio.Event()
         self._task: asyncio.Task | None = None
@@ -56,6 +68,12 @@ class Engine:
 
     def _changed(self) -> None:
         self.rev += 1
+        if self.history:
+            for claim in self.claims:
+                cid = claim["id"]
+                if cid in self.status or claim.get("judge"):
+                    self.history.save_claim(claim, self.status.get(cid, "ready"),
+                                            self.steps.get(cid, 0), self.review.get(cid), self.retry.get(cid, False))
         snap = self.snapshot()
         for q in list(self._subs):
             # Drop stale frames for slow clients; only the newest snapshot matters.
@@ -165,4 +183,7 @@ class Engine:
                                 "text": f"{cid} · {text}", "ok": res})
             del self.log[LOG_LIMIT:]
             self.steps[cid] = cur + 1
+            if self.history:
+                self.history.record(cid, claim["persona"], "check_step",
+                                    {"worker": who, "text": text, "result": res})
             self._changed()

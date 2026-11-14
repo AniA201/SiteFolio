@@ -43,7 +43,7 @@ export default function History({ S, A }) {
         <div className="tile">
           <h4>The double-charge check</h4>
           <pre className="json" style={{ marginTop: 12 }}>{DOUBLE_CHARGE_SQL}</pre>
-          <p className="muted small" style={{ lineHeight: 1.5 }}>Runs on every rent application and every bill. It caught the Vermont Gardens roof being charged to tenants twice.</p>
+          <p className="muted small" style={{ lineHeight: 1.5 }}>Checks active surcharges for the same property and type of work. Claims still require a reviewer to decide.</p>
           <button className="btn black sm" onClick={() => { A.setPersona("reviewer"); A.go("claims"); }}>Try it on Vermont Gardens</button>
         </div>
       </section>
@@ -63,7 +63,7 @@ export default function History({ S, A }) {
         <div className="tile">
           <h4>Live events</h4>
           <div className="term" style={{ marginTop: 12, maxHeight: 220 }}>
-            {S.log.length === 0 ? <span className="g">Run a check to stream events here.</span> : S.log.slice(0, 9).map((l, k) => <div key={k}><span className="g">INSERT</span> {l.t} · {l.who} · {l.text.slice(0, 46)}</div>)}
+            {!history?.recent?.length ? <span className="g">No stored events yet.</span> : history.recent.map((event, k) => <div key={k}><span className="g">{event.kind}</span> {event.claim_id} · {event.detail?.text || event.detail?.status || event.detail?.action || "recorded"}</div>)}
           </div>
         </div>
       </section>

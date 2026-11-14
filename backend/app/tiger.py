@@ -29,6 +29,15 @@ CREATE TABLE IF NOT EXISTS surcharge_registry (
   source_claim_id TEXT UNIQUE
 );""", """CREATE INDEX IF NOT EXISTS surcharge_active_lookup
   ON surcharge_registry (property_id, lower(work), ends)""", """
+CREATE TABLE IF NOT EXISTS claim_state (
+  claim_id TEXT PRIMARY KEY,
+  claim JSONB NOT NULL,
+  status TEXT NOT NULL,
+  steps INTEGER NOT NULL DEFAULT 0,
+  review TEXT,
+  retry BOOLEAN NOT NULL DEFAULT false,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+)""", """
 CREATE MATERIALIZED VIEW IF NOT EXISTS history_weekly
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT time_bucket('1 week', at) AS week, persona,
@@ -61,6 +70,28 @@ class TigerHistory:
             db.execute("INSERT INTO history_events (claim_id, persona, kind, detail, paid, held) VALUES (%s,%s,%s,%s,%s,%s)",
                        (claim_id, persona, kind, Jsonb(detail or {}), paid, held))
 
+    def save_claim(self, claim, status, steps=0, review=None, retry=False):
+        if not self.enabled:
+            return
+        with connect(self.url) as db:
+            db.execute("""INSERT INTO claim_state (claim_id, claim, status, steps, review, retry)
+                VALUES (%s,%s,%s,%s,%s,%s)
+                ON CONFLICT (claim_id) DO UPDATE SET claim=EXCLUDED.claim, status=EXCLUDED.status,
+                steps=EXCLUDED.steps, review=EXCLUDED.review, retry=EXCLUDED.retry, updated_at=now()""",
+                (claim["id"], Jsonb(claim), status, steps, review, retry))
+
+    def load_claims(self):
+        if not self.enabled:
+            return []
+        with connect(self.url, row_factory=dict_row) as db:
+            return db.execute("SELECT claim, status, steps, review, retry FROM claim_state ORDER BY updated_at").fetchall()
+
+    def clear_claims(self):
+        if not self.enabled:
+            return
+        with connect(self.url) as db:
+            db.execute("DELETE FROM claim_state")
+
     def active_surcharges(self, property_id, work):
         if not self.enabled:
             return []
@@ -79,11 +110,13 @@ class TigerHistory:
 
     def dashboard(self, persona):
         if not self.enabled:
-            return {"connected": False, "events": 0, "weekly": [], "surcharges": []}
+            return {"connected": False, "events": 0, "weekly": [], "surcharges": [], "recent": []}
         with connect(self.url, row_factory=dict_row) as db:
             events = db.execute("SELECT count(*) AS n FROM history_events").fetchone()["n"]
             weekly = db.execute("SELECT week, events, paid, held FROM history_weekly WHERE persona=%s ORDER BY week DESC LIMIT 7", (persona,)).fetchall()
             surcharges = db.execute("SELECT property_id, building, work, approved, ends, per_unit FROM surcharge_registry ORDER BY approved DESC").fetchall()
+            recent = db.execute("SELECT at, claim_id, kind, detail FROM history_events WHERE persona=%s ORDER BY at DESC, id DESC LIMIT 12", (persona,)).fetchall()
         return {"connected": True, "events": events,
                 "weekly": [{**row, "week": row["week"].isoformat(), "paid": float(row["paid"]), "held": float(row["held"])} for row in weekly],
-                "surcharges": [{**row, "approved": row["approved"].isoformat(), "ends": row["ends"].isoformat(), "per_unit": float(row["per_unit"])} for row in surcharges]}
+                "surcharges": [{**row, "approved": row["approved"].isoformat(), "ends": row["ends"].isoformat(), "per_unit": float(row["per_unit"])} for row in surcharges],
+                "recent": [{**row, "at": row["at"].isoformat()} for row in recent]}

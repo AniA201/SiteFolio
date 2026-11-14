@@ -160,6 +160,7 @@ def judge(body: JudgeBill):
 @app.post("/api/reset")
 def reset_everything():
     """Restore the demo to its starting state."""
+    tiger.clear_claims()
     engine.reset_all()
     engine._changed()
     return engine.snapshot()
