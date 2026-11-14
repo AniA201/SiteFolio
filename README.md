@@ -56,9 +56,9 @@ Real buildings: after the keys are set, fetch and build the real data set (kept 
 
 `kit_index` indexes all 3,339 kit buildings for the Buildings page and joins each to its Apartments.com listing, current tenants, last sale and active listings.
 
-Deep agent (free models only): each check runs the LangChain deep agent in `backend/app/agent/`. A coordinator plans with `write_todos`, sends three helper agents (roof inspector on Vexcel, interior inspector on Matterport, records clerk on the CoStar kit and vendor file), revises its plan when a check fails, writes an evidence folder, keeps long-term memory of vendors and buildings in `/memories/` (a LangGraph store saved to `backend/app/data/agent_memory.json`), and pauses at `record_decision` until a person approves or rejects in Review, which resumes the same run. Amounts always come from the plain-code math tools; if the agent's verdict contradicts the rules (blocking a bill whose bank account matches, or deciding without the math), the rules' result stands and the overrule is shown.
+Deep agent: each check runs the LangChain deep agent in `backend/app/agent/`. A coordinator plans with `write_todos`, sends three helper agents (roof inspector on Vexcel, interior inspector on Matterport, records clerk on the CoStar kit and vendor file), revises its plan when a check fails, writes an evidence folder, keeps long-term memory of vendors and buildings in `/memories/` (a LangGraph store saved to `backend/app/data/agent_memory.json`), and pauses at `record_decision` until a person approves or rejects in Review, which resumes the same run. Amounts always come from the plain-code math tools; if the agent's verdict contradicts the rules (blocking a bill whose bank account matches, or deciding without the math), the rules' result stands and the overrule is shown.
 
-Models cost nothing: Groq's free tier first (`openai/gpt-oss-120b` for the coordinator, smaller Groq models for the helpers, each with its own per-minute budget), and on any rate limit, timeout or malformed tool call that single step falls over to Ollama on this machine (`gpt-oss:20b`). If both fail, the recorded plan replays. Set `GROQ_API_KEY`, run `ollama pull gpt-oss:20b`, and optionally `LANGSMITH_API_KEY` (free plan) for a trace link on every run. `PLUMBLINE_AGENT=replay` forces the recorded plans. Check the agent against the rules on every demo claim:
+Models, tried in order for every call: **AWS Bedrock** when `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_REGION` are set (Claude Sonnet coordinates, Claude Haiku runs the helpers, Amazon Nova Pro/Lite as the Bedrock backup; Claude on Bedrock needs AWS's one-time Anthropic use-case form, Nova doesn't). A model the account can't use yet is skipped for 15 minutes instead of failing every step. Then the free models: Groq's free tier (`openai/gpt-oss-120b` for the coordinator, smaller Groq models for the helpers, each with its own per-minute budget), and on any rate limit, timeout or malformed tool call that single step falls over to Ollama on this machine (`gpt-oss:20b`). If both fail, the recorded plan replays. Set `GROQ_API_KEY`, run `ollama pull gpt-oss:20b`, and optionally `LANGSMITH_API_KEY` (free plan) for a trace link on every run. `PLUMBLINE_AGENT=replay` forces the recorded plans. Check the agent against the rules on every demo claim:
 
 ```bash
 .venv/bin/python -m scripts.eval_agent
@@ -151,7 +151,7 @@ HTTPS automatically and asks for a site password. Live demo: https://66-135-21-6
 
 ## Open-source credits
 - Agent: [deepagents](https://github.com/langchain-ai/deepagents), LangChain, LangGraph; tracing in LangSmith (free tier).
-- Free models: OpenAI gpt-oss (open weights) and Qwen, served by Groq's free tier, with fallback to Ollama on the laptop.
+- Models: AWS Bedrock (Anthropic Claude, Amazon Nova) via langchain-aws; OpenAI gpt-oss (open weights) and Qwen on Groq's free tier; Ollama on the laptop.
 - Backend: FastAPI, Uvicorn, httpx, pydantic, pypdf, pyzipper, qrcode.
 - Frontend: React, Vite, Three.js; Matterport Showcase SDK for the 3D tours.
 - Hosting: Vultr Cloud Compute, Caddy, sslip.io.

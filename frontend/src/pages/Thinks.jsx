@@ -2,6 +2,13 @@ import { useState } from "react";
 import { BUILDINGS, partyOf } from "../data";
 import { Flag, Head, J, NEEDS, WHO } from "../lib";
 
+// Which provider answered most of the run's model calls, for labels.
+export const providerOf = ag => {
+  const calls = Object.entries(ag?.models || {});
+  const bedrock = calls.filter(([m]) => m.startsWith("Bedrock")).reduce((t, [, k]) => t + k, 0);
+  return bedrock * 2 >= calls.reduce((t, [, k]) => t + k, 0) && bedrock ? "AWS Bedrock" : "free models";
+};
+
 const LANES = ["coordinator", "records", "roof", "interior", "rules"];
 const LANE_COLOR = { coordinator: "var(--ink)", records: "var(--ink3)", roof: "var(--accent)", interior: "var(--g3)", rules: "var(--ink2)" };
 
@@ -57,11 +64,11 @@ export default function Thinks({ S, A }) {
   return (
     <div className="wrapx">
       <Head over="For the LangChain judges" title="How it thinks"
-        lede="A LangChain deep agent on free models: it plans with a to-do list, sends three helper agents to the data layers, changes its plan when a check fails, writes an evidence folder, remembers vendors and buildings, and pauses for a person before money moves."
+        lede="A LangChain deep agent on AWS Bedrock, with free models as backup: it plans with a to-do list, sends three helper agents to the data layers, changes its plan when a check fails, writes an evidence folder, remembers vendors and buildings, and pauses for a person before money moves."
         right={trace ? <a className="btn gray" href={trace} target="_blank" rel="noopener">Open LangSmith trace ↗</a>
           : <button className="btn gray" disabled>{ag ? "Trace is uploading…" : "Run live to get a trace"}</button>} />
       <div className="row wrap" style={{ marginBottom: 18, gap: 8 }}>
-        {[["Agent", "deepagents + LangGraph"], ["Models", "free: Groq gpt-oss and Qwen, with Ollama on the laptop as backup"], ["Data", "CoStar · Vexcel · Matterport"], ["Money and rent math", "plain code, no AI"]].map(([k, v]) =>
+        {[["Agent", "deepagents + LangGraph"], ["Models", "AWS Bedrock (Claude, Nova), then free Groq and Ollama as backup"], ["Data", "CoStar · Vexcel · Matterport"], ["Money and rent math", "plain code, no AI"]].map(([k, v]) =>
           <span key={k} className="tag t-ready" style={{ fontSize: 13, padding: "8px 14px" }}><b style={{ color: "var(--ink)" }}>{k}</b>&nbsp;{v}</span>)}
       </div>
       <div className="row wrap" style={{ marginBottom: 18 }}>
@@ -70,7 +77,7 @@ export default function Thinks({ S, A }) {
       {!done && (
         <div className="tile">
           <h4>{c.id} hasn't run yet</h4>
-          <p className="muted small">A live run takes about 30–70 seconds on the free models. Steps stream in as the agent works.</p>
+          <p className="muted small">A live run takes about a minute. Steps stream in as the agent works.</p>
           <button className="btn black sm" style={{ marginTop: 12 }} disabled={S.running} onClick={() => A.run(c.id)}>Run the agent now</button>
         </div>
       )}
@@ -96,7 +103,7 @@ export default function Thinks({ S, A }) {
                 <div className="track">{c.steps.map((s, k) => s[0] === l && <div key={k} className="seg" style={{ left: (k / n) * 100 + "%", width: (1 / n) * 100 - 1 + "%", background: LANE_COLOR[l] }} />)}</div>
               </div>
             ))}
-            {ag?.models && <p className="muted small" style={{ marginTop: 14 }}>Model calls: {Object.entries(ag.models).map(([m, k]) => `${m} × ${k}`).join(" · ")}. All free.</p>}
+            {ag?.models && <p className="muted small" style={{ marginTop: 14 }}>Model calls: {Object.entries(ag.models).map(([m, k]) => `${m} × ${k}`).join(" · ")}.</p>}
           </div>
         </div>
         <div className="grid g3" style={{ marginTop: 16 }}>
@@ -125,7 +132,7 @@ export default function Thinks({ S, A }) {
           </div>
         </div>
       </>}
-      <div style={{ marginTop: 14 }}><Flag t={ag ? "Live run on free models · trace in LangSmith" : "Recorded plan · run live for the agent's own trace"} /></div>
+      <div style={{ marginTop: 14 }}><Flag t={ag ? `Live run on ${providerOf(ag)} · trace in LangSmith` : "Recorded plan · run live for the agent's own trace"} /></div>
     </div>
   );
 }

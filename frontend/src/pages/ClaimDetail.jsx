@@ -1,4 +1,5 @@
 import SolanaPanel from "../components/SolanaPanel";
+import { providerOf } from "./Thinks";
 import { useState } from "react";
 import { BUILDINGS, PARTIES, PERSONAS, partyOf } from "../data";
 import { COL, Check, Flag, J, LAYER, SvcChip, Tag, WHO, aerialKind, fmt, isLayer, money, sqft } from "../lib";
@@ -263,7 +264,7 @@ export default function ClaimDetail({ S, A, id }) {
         <div className="row between" style={{ alignItems: "flex-end", marginTop: 10 }}>
           <div>
             <h1 className="h1">{c.title}</h1>
-            <div className="row wrap" style={{ marginTop: 14 }}><Tag s={st} />{c.solana?.state === "recorded" && <a className="tag t-paid" href={c.solana.explorer} target="_blank" rel="noopener">On Solana ↗</a>}{c.agent?.live && <span className="tag t-running" title={Object.keys(c.agent.models || {}).join(", ")}>Live agent · free models</span>}<span className="muted">{p.name} ({p.role.toLowerCase()}) · {B.name}, {B.city} · <b style={{ color: "var(--ink)" }}>{fmt(c.amount)}</b></span></div>
+            <div className="row wrap" style={{ marginTop: 14 }}><Tag s={st} />{c.solana?.state === "recorded" && <a className="tag t-paid" href={c.solana.explorer} target="_blank" rel="noopener">On Solana ↗</a>}{c.agent?.live && <span className="tag t-running" title={Object.keys(c.agent.models || {}).join(", ")}>Live agent · {providerOf(c.agent)}</span>}<span className="muted">{p.name} ({p.role.toLowerCase()}) · {B.name}, {B.city} · <b style={{ color: "var(--ink)" }}>{fmt(c.amount)}</b></span></div>
           </div>
           <div className="row">
             <button className="btn gray" disabled={mine} onClick={() => A.reset(c.id)}>Reset</button>
