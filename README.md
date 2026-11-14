@@ -10,6 +10,11 @@ backend/    FastAPI API server: claim store, agent runner, rules, SSE stream
   app/engine.py     in-memory state + runner (replays scripted plans today; swap in the deep agent)
   app/rules.py      plain-code rules (Try to fool it invoice check, money math)
   app/calls.py      request/response record builders for the data calls
+  app/money.py      roof slope/waste adjustment, bill splits, payment checks, LA rent and draw math
+  app/settings.py   keys from backend/.env (see backend/.env.example)
+  app/integrations/ Matterport (GraphQL + models_index.csv), Vexcel (ortho), CoStar (kit zip)
+  app/routes_data.py /api/data routes onto the data layers
+  tests/            pytest suite
   app/data/*.json   sample buildings, parties, personas, claims, surcharges
 frontend/   React + Vite app
   src/pages/        Overview, Claims, ClaimDetail, Review, Tenant, History, Thinks, Fool
@@ -27,6 +32,22 @@ cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 ```bash
 cd backend && .venv/bin/uvicorn app.main:app --reload --port 8787
+```
+
+Keys: copy `backend/.env.example` to `backend/.env` and fill it in. `GET /api/health` shows which integrations are configured. Check them from `backend/`:
+
+```bash
+.venv/bin/python -m app.integrations.matterport
+```
+
+```bash
+.venv/bin/python -m app.integrations.costar
+```
+
+Tests:
+
+```bash
+cd backend && .venv/bin/pip install -r requirements-dev.txt && .venv/bin/python -m pytest -q
 ```
 
 Frontend (port 5180, proxies `/api` to 8787; set `PLUMBLINE_API` to point elsewhere):
@@ -52,5 +73,10 @@ Production: `npm run build` in `frontend/`, then the backend serves `frontend/di
 | POST | `/api/claims/{id}/decision` | `{action: "ok" \| "sent" \| "rejected" \| null}` |
 | POST | `/api/judge` | `{area, amount, bank, hidden}` Try to fool it bill |
 | POST | `/api/reset` | Restore the starting state |
+| GET | `/api/health` | Which integrations have keys (booleans only) |
+| GET | `/api/data/matterport/models/near` | `lat, lon, radius_m` models from models_index.csv |
+| GET | `/api/data/matterport/models/{id}` | Model basics |
+| GET | `/api/data/matterport/models/{id}/rooms` | Rooms with labels and areas in sq ft |
+| GET | `/api/data/vexcel/ortho.jpg` | `lat, lon, half_side_m, pixels` aerial image |
 
 All buildings, parties and numbers are sample data.
