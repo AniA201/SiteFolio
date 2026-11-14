@@ -1,6 +1,5 @@
 // How it thinks, History, the Buildings explorer, the 3D tour and reports (docs/TESTING.md T, B, P, M).
-const { test, expect } = require("@playwright/test");
-const { resetApp, persona, open, runClaim } = require("./helpers");
+const { test, expect, resetApp, persona, open, runClaim } = require("./helpers");
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ request }) => resetApp(request));

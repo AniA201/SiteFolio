@@ -1,7 +1,6 @@
 // Safety checks (docs/TESTING.md S): retries never pay twice, reset keeps the page in sync, and every owner bill
 // still decides correctly when checks run back to back.
-const { test, expect } = require("@playwright/test");
-const { resetApp, open, runClaim, expectDecision } = require("./helpers");
+const { test, expect, resetApp, open, runClaim, expectDecision } = require("./helpers");
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ request }) => resetApp(request));

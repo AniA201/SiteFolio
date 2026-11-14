@@ -1,6 +1,5 @@
 // Upload a typed bill on the Claims page (rule-based reader). docs/TESTING.md "Upload a real bill".
-const { test, expect } = require("@playwright/test");
-const { resetApp, persona, open, expectDecision, waitForStatus, stateClaims } = require("./helpers");
+const { test, expect, resetApp, persona, open, expectDecision, waitForStatus, stateClaims } = require("./helpers");
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ request }) => resetApp(request));

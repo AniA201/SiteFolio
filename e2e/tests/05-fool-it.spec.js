@@ -1,6 +1,5 @@
 // "Try to fool it": a judge's bill for the 1113 Vine St roof (35,909 sq ft, approved account ••4421). docs/TESTING.md F1–F4.
-const { test, expect } = require("@playwright/test");
-const { resetApp, open, expectDecision, waitForStatus, stateClaims } = require("./helpers");
+const { test, expect, resetApp, open, expectDecision, waitForStatus, stateClaims } = require("./helpers");
 
 test.describe.configure({ mode: "serial" });
 test.beforeAll(async ({ request }) => resetApp(request));
