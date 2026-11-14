@@ -221,8 +221,12 @@ function EvidenceTab({ S, c, step, done }) {
       <div className="tile">
         <h4>Evidence folder</h4>
         <div className="term" style={{ marginTop: 14 }}>
-          <div><b>/evidence/{c.id.toLowerCase()}/</b></div>
-          {files.map(f => <div key={f}>  {done ? "" : <span className="g">(pending) </span>}{f}</div>)}
+          {c.evidence_files ? Object.keys(c.evidence_files).sort().map(f => (
+            <details key={f}><summary style={{ cursor: "pointer" }}>{f}</summary><pre style={{ whiteSpace: "pre-wrap", margin: "4px 0 8px", color: "rgba(255,255,255,.75)" }}>{c.evidence_files[f]}</pre></details>
+          )) : <>
+            <div><b>/evidence/{c.id.toLowerCase()}/</b></div>
+            {files.map(f => <div key={f}>  {done ? "" : <span className="g">(pending) </span>}{f}</div>)}
+          </>}
         </div>
         <h4 style={{ marginTop: 18 }}>Audit log</h4>
         <div className="term" style={{ marginTop: 10 }}>
@@ -256,7 +260,7 @@ export default function ClaimDetail({ S, A, id }) {
         <div className="row between" style={{ alignItems: "flex-end", marginTop: 10 }}>
           <div>
             <h1 className="h1">{c.title}</h1>
-            <div className="row wrap" style={{ marginTop: 14 }}><Tag s={st} /><span className="muted">{p.name} ({p.role.toLowerCase()}) · {B.name}, {B.city} · <b style={{ color: "var(--ink)" }}>{fmt(c.amount)}</b></span></div>
+            <div className="row wrap" style={{ marginTop: 14 }}><Tag s={st} />{c.agent?.live && <span className="tag t-running" title={Object.keys(c.agent.models || {}).join(", ")}>Live agent · free models</span>}<span className="muted">{p.name} ({p.role.toLowerCase()}) · {B.name}, {B.city} · <b style={{ color: "var(--ink)" }}>{fmt(c.amount)}</b></span></div>
           </div>
           <div className="row">
             <button className="btn gray" disabled={mine} onClick={() => A.reset(c.id)}>Reset</button>
