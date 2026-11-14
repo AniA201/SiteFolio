@@ -8,7 +8,7 @@ import asyncio
 import copy
 from datetime import datetime
 
-from .fixtures import CLAIMS
+from .fixtures import BUILDINGS, CLAIMS
 from .rules import build_judge_claim
 
 STEP_DELAY = 0.55
@@ -71,7 +71,7 @@ class Engine:
         if self.history:
             for claim in self.claims:
                 cid = claim["id"]
-                if cid in self.status or claim.get("judge"):
+                if cid in self.status or cid in self.queue or claim.get("judge"):
                     self.history.save_claim(claim, self.status.get(cid, "ready"),
                                             self.steps.get(cid, 0), self.review.get(cid), self.retry.get(cid, False))
         snap = self.snapshot()
@@ -171,6 +171,22 @@ class Engine:
         while self.current == cid:
             cur = self.steps.get(cid, 0)
             if cur >= len(claim["steps"]):
+                if self.history and self.history.enabled and claim["persona"] == "reviewer" and claim["kind"] == "rentdup":
+                    property_id = BUILDINGS[claim["b"]]["cs"]
+                    matches = self.history.active_surcharges(property_id, "roof")
+                    claim["history_check"] = {
+                        "property_id": property_id,
+                        "work": "roof",
+                        "active_count": len(matches),
+                        "source": "Tiger Cloud",
+                    }
+                    if matches:
+                        claim["outcome"]["status"] = "denied"
+                        claim["outcome"]["reason"] = "An active roof surcharge exists for this property. Review the registry record before approving another charge."
+                    else:
+                        claim["outcome"]["status"] = "blocked"
+                        claim["outcome"]["reason"] = "No active roof surcharge was found in Tiger Cloud. The sample duplicate-charge result is unverified; review the application and evidence manually."
+                    self.history.record(cid, "reviewer", "surcharge_checked", claim["history_check"])
                 self.status[cid] = claim["outcome"]["status"]
                 if self.history:
                     self.history.record(cid, claim["persona"], "check_completed", {"status": self.status[cid]})
