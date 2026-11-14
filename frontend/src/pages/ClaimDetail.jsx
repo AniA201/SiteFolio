@@ -227,7 +227,9 @@ function EvidenceTab({ S, c, step, done }) {
         </div>
       </div>
       <div className="tile">
-        <div className="row between"><h4>decision.json</h4><button className="btn white sm" disabled={!done}>Export report</button></div>
+        <div className="row between"><h4>decision.json</h4><div className="row">
+          {done && <a className="small" style={{ textDecoration: "underline" }} href={`/api/claims/${c.id}/decision.json`}>Download JSON</a>}
+          <button className="btn white sm" disabled={!done} onClick={() => window.open(`/api/claims/${c.id}/report`, "_blank", "noopener")}>Export report</button></div></div>
         <pre className="json" style={{ marginTop: 14, minHeight: 260 }}>{done ? J(record) : "// Run the agent to write the evidence file"}</pre>
       </div>
     </section>
