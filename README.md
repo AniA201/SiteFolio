@@ -78,6 +78,9 @@ cd frontend && npm install && npm run dev
 
 Production: `npm run build` in `frontend/`, then the backend serves `frontend/dist` at `/`.
 
+## Click-through tests
+Every scenario in [docs/TESTING.md](docs/TESTING.md) runs in a visible Chromium window with Playwright: `cd e2e && npm install && npx playwright install chromium && npm test`. See [e2e/README.md](e2e/README.md).
+
 ## API
 
 | Method | Path | What it does |

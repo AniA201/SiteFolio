@@ -1,5 +1,8 @@
 # Plumbline manual testing guide
 
+Every scenario here is also automated as a click-through in Chromium: see [e2e/README.md](../e2e/README.md)
+(`cd e2e && npm test`).
+
 Every scenario below uses the data that ships with the app (real CoStar, Vexcel and Matterport data for the buildings,
 sample bills and parties). Run them on the laptop (`http://localhost:8787`) or the live site
 (`https://66-135-21-65.sslip.io`, user `plumbline`, password = `SITE_PASSWORD` in `backend/.env`).
