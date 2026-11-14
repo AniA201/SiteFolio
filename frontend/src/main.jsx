@@ -11,6 +11,6 @@ loadMeta()
   .catch(err => root.render(
     <div style={{ padding: 40, fontFamily: "system-ui" }}>
       <h2>Plumbline API is not reachable</h2>
-      <p>{String(err.message)}. Start the backend on port 8000 and reload.</p>
+      <p>{String(err.message)}. Start the backend on port 8787 and reload.</p>
     </div>
   ));

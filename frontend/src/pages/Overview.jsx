@@ -1,92 +1,77 @@
-import { useState } from "react";
-import { META, PARTIES, PERSONAS, partyOf } from "../data";
-import { COL, FINAL, NEEDS, SvcChip, Tag, fmt, money, sumNum } from "../lib";
-import { Aerial, FloorPlan } from "../components/Illustrations";
+import { BUILDINGS, META, partyOf } from "../data";
+import { COL, FINAL, NEEDS, Tag, fmt, money, sumNum } from "../lib";
+import EvidenceWalkthrough from "../components/EvidenceWalkthrough";
 
-// Hero stories per persona: [title, text, claim to open, building drawn behind it]
-const STORIES = {
-  owner: [
-    ["The roof that shrank", "A roofer billed 14,500 sq ft. The building record and the aerial image both say 9,820.", "CLM-2207", "wc"],
-    ["Twelve units, eight on the roof", "The image from above and the 3D scan inside both count 8 AC units. The bill says 12.", "CLM-2214", "wc"],
-    ["\"We changed banks.\"", "A bill asked to pay a new account. Plumbline paid $0 and opened a review.", "CLM-2223", "wc"],
-  ],
-  reviewer: [
-    ["Rent up for a roof a third smaller", "A landlord claimed 10,800 sq ft of roof. The building has 7,200. Tenants would overpay for 5 years.", "RSO-3104", "wca"],
-    ["The same roof, charged twice", "Tenants already pay for this roof until 2029. The history check catches it.", "RSO-3104", "vg"],
-  ],
-  lender: [
-    ["Floor 3 isn't finished yet", "The builder asked for $400,000. The latest scan shows 9 of 12 units done.", "DRW-0412", "ml"],
-    ["Release money for real progress", "Check the building from your desk before every loan payment.", "DRW-0412", "ml"],
-  ],
+const FEATURED = {
+  owner: ["CLM-2207", "wc"],
+  reviewer: ["RSO-3104", "wca"],
+  lender: ["DRW-0412", "ml"],
 };
 
-const VIEWS = [
-  ["CoStar", "The record", "What is this building? Size, floors, units, age.", <Aerial b="wc" kind="footprint" show={false} />],
-  ["Vexcel", "From above", "How big is the roof? How many AC units? How big is the lot?", <Aerial b="wc" kind="roof" show />],
-  ["Matterport", "Inside", "How big are the rooms? Which rooms exist? Walk the live 3D tour.", <FloorPlan show />],
-];
+const HEADLINES = {
+  owner: ["Verify the work.", "Then pay the bill."],
+  reviewer: ["Check the work", "behind the rent."],
+  lender: ["Verify progress.", "Then release funds."],
+};
+
+const LEDE = {
+  owner: "Compare contractor invoices with property records, aerial surveys, and interior scans before approving payment.",
+  reviewer: "Check the improvements behind a rent increase and show tenants how the amount was calculated.",
+  lender: "Verify the progress behind a construction draw and see what work remains.",
+};
 
 function statTiles(persona, done, waiting, status) {
   if (persona === "owner") return [
-    ["Held with proof", fmt(sumNum(done.filter(c => c.outcome.status === "partial"), "b")), "overbilling held back", "amber"],
-    ["Fraud stopped", fmt(sumNum(done.filter(c => c.outcome.status === "blocked"), "b")), "fake bank changes", "red"],
-    ["Paid correctly", fmt(sumNum(done, "a")), done.length + " bills verified", "ink"],
-    ["Waiting", waiting.length, "bills to check", "ink"],
+    ["Held with proof", fmt(sumNum(done.filter(c => c.outcome.status === "partial"), "b")), "overbilling held back"],
+    ["Fraud stopped", fmt(sumNum(done.filter(c => c.outcome.status === "blocked"), "b")), "fake bank changes"],
+    ["Paid correctly", fmt(sumNum(done, "a")), done.length + " bills verified"],
+    ["Waiting", waiting.length, "bills to check"],
   ];
   if (persona === "reviewer") return [
-    ["Tenant savings", "$" + done.reduce((t, c) => t + (c.rent ? (c.rent.claimed - c.rent.verified) * c.rent.units : 0), 0).toFixed(0) + "/mo", "across all units", "amber"],
-    ["Reduced or denied", done.filter(c => ["reduced", "denied"].includes(status[c.id])).length, "applications", "red"],
-    ["Checked", done.length, "applications", "ink"],
-    ["Waiting", waiting.length, "to check", "ink"],
+    ["Tenant savings", "$" + done.reduce((t, c) => t + (c.rent ? (c.rent.claimed - c.rent.verified) * c.rent.units : 0), 0).toFixed(0) + "/mo", "across all units"],
+    ["Reduced or denied", done.filter(c => ["reduced", "denied"].includes(status[c.id])).length, "applications"],
+    ["Checked", done.length, "applications"],
+    ["Waiting", waiting.length, "to check"],
   ];
   return [
-    ["Released", fmt(sumNum(done, "a")), "for verified work", "ink"],
-    ["Held until done", fmt(sumNum(done, "b")), "unfinished work", "amber"],
-    ["Checked", done.length, "loan requests", "ink"],
-    ["Waiting", waiting.length, "to check", "ink"],
+    ["Released", fmt(sumNum(done, "a")), "for verified work"],
+    ["Held until done", fmt(sumNum(done, "b")), "unfinished work"],
+    ["Checked", done.length, "loan requests"],
+    ["Waiting", waiting.length, "to check"],
   ];
 }
 
 export default function Overview({ S, A }) {
   const { list, status, persona } = S;
-  const [slide, setSlide] = useState(0);
-  const stories = (META.stories || STORIES)[persona];
-  const at = slide % stories.length;
-  const [title, text, claimId, building] = stories[at];
+  const story = META.stories?.[persona]?.[0];
+  const [claimId, building] = story ? story.slice(2) : FEATURED[persona];
+  const featured = list.find(claim => claim.id === claimId);
+  const property = BUILDINGS[featured?.b || building];
+  const lines = featured?.lines ?? [];
+  const [comparison] = lines;
   const done = list.filter(c => FINAL.includes(status[c.id]));
   const waiting = list.filter(c => !status[c.id] || status[c.id] === "ready");
   const attention = done.filter(c => NEEDS.includes(status[c.id]) && !S.review[c.id]);
   const tiles = statTiles(persona, done, waiting, status);
-  const tone = c => c === "red" && done.length ? "var(--red)" : c === "amber" && done.length ? "var(--amberDeep)" : "#000";
 
   return (
-    <div className="wrapx" style={{ paddingTop: 20 }}>
-      <div className="hero">
-        <Aerial b={building} kind="roof" show big />
-        <div className="shade" />
-        <div className="in">
-          <div className="over" style={{ color: "rgba(255,255,255,.75)" }}>{PERSONAS[persona].label} · {PERSONAS[persona].org}</div>
-          <h1 className="h1" style={{ fontSize: 64, color: "#fff" }}>{title}</h1>
-          <p className="lede" style={{ color: "rgba(255,255,255,.85)" }}>{text}</p>
-          <div className="row wrap" style={{ marginTop: 28 }}>
-            <button className="btn white" disabled={!waiting.length || S.running} onClick={A.runAll}>{S.running ? "Checking…" : waiting.length ? `Check ${waiting.length} waiting` : "All checked"}</button>
-            <button className="btn glass" onClick={() => A.go("claim", claimId)}>See this check</button>
-          </div>
-        </div>
-        <div className="row" style={{ position: "absolute", bottom: 24, left: 64, right: 24, justifyContent: "space-between" }}>
-          <div className="dots">{stories.map((_, i) => <i key={i} className={i === at ? "on" : ""} onClick={() => setSlide(i)} />)}</div>
-          <div className="row">
-            <button className="arrow" onClick={() => setSlide((slide + stories.length - 1) % stories.length)}>←</button>
-            <button className="arrow" onClick={() => setSlide((slide + 1) % stories.length)}>→</button>
-          </div>
-        </div>
-      </div>
-
-      <section className="grid g4" style={{ marginTop: 16 }}>
-        {tiles.map(([label, value, desc, c]) => (
+    <div className="overview">
+      <EvidenceWalkthrough headline={HEADLINES[persona]} lede={LEDE[persona]} property={property}
+        featured={featured} waiting={waiting.length} running={S.running} onRun={A.runAll} />
+      <div className="wrapx overview-ledger" id="workspace-summary" tabIndex={-1}>
+      {comparison && (
+        <section className="featured-check" aria-labelledby="featured-title">
+          <div><p className="over">Featured case</p><h2 id="featured-title">{featured.title}</h2></div>
+          <div><small>The paper says</small><strong>{comparison[1]}</strong></div>
+          <div><small>The building says</small><strong>{comparison[2]}</strong></div>
+          <a href={`#/claim/${claimId}`} className="text-link">Inspect the check <span aria-hidden="true">↗</span></a>
+        </section>
+      )}
+      <section className="grid g4 ledger" aria-label="Workspace totals">
+        {tiles.map(([label, value, desc]) => (
           <div className="tile" key={label}>
             <div className="over">{label}</div>
-            <div className="stat num" style={{ color: tone(c) }}>{value}</div>
+            <div className="stat num">{value}</div>
             <div className="muted small" style={{ marginTop: 8 }}>{desc}</div>
           </div>
         ))}
@@ -116,22 +101,7 @@ export default function Overview({ S, A }) {
         </div>
       </section>
 
-      <section className="giant">
-        <div className="w">3 VIEWS</div>
-        <p className="lede" style={{ margin: "6px auto 28px", textAlign: "center" }}>Every claim is checked against three views of the same building. When two views agree with each other but not with the paper, the paper is wrong.</p>
-      </section>
-      <section className="grid g3" style={{ paddingTop: 0 }}>
-        {VIEWS.map(([svc, heading, desc, img]) => (
-          <div key={svc} className="tile" style={{ padding: 0, overflow: "hidden" }}>
-            <div style={{ background: "#fff" }}>{img}</div>
-            <div style={{ padding: 22 }}>
-              <SvcChip s={svc} />
-              <h4 style={{ fontSize: 22, marginTop: 10 }}>{heading}</h4>
-              <p className="muted" style={{ lineHeight: 1.5 }}>{desc}</p>
-            </div>
-          </div>
-        ))}
-      </section>
+      </div>
     </div>
   );
 }

@@ -45,7 +45,7 @@ export default function Claims({ S, A }) {
             </tbody>
           </table></div>
         </div>
-        <div className="tile" style={{ textAlign: "center", display: "grid", placeItems: "center", border: `2px dashed ${drag ? "var(--amber)" : "var(--g3)"}`, background: drag ? "#FFF8E6" : "#fff" }}
+        <div className="tile" style={{ textAlign: "center", display: "grid", placeItems: "center", border: `2px dashed ${drag ? "var(--accent)" : "var(--g3)"}`, background: drag ? "var(--accent-soft)" : "var(--surface)" }}
           onDragOver={e => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)}
           onDrop={e => { e.preventDefault(); setDrag(false); send(e.dataTransfer.files?.[0]); }}>
           <div>
