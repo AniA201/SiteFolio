@@ -19,6 +19,7 @@ export const api = {
   run: id => post(`/claims/${id}/run`),
   runAll: persona => post("/claims/run-all", { persona }),
   reset: id => post(`/claims/${id}/reset`),
+  resetAll: () => post("/reset"),
   retry: id => post(`/claims/${id}/retry`),
   decide: (id, action) => post(`/claims/${id}/decision`, { action }),
   ingest: sampleId => post("/claims/ingest", { sample_id: sampleId }),

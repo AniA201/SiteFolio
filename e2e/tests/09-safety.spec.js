@@ -27,3 +27,16 @@ test("a whole-app reset keeps the open page live (state version never goes backw
   expect(after).toBeGreaterThan(before);
   await expect(page.getByRole("cell", { name: "CLM-2207" })).toBeVisible();
 });
+
+test("Reset demo in the menu asks first, then clears the demo; the reset address alone does nothing", async ({ page, request }) => {
+  const get = await request.get("/api/reset");
+  expect(get.status()).toBe(404);
+  await runClaim(page, "CLM-2219");
+  await page.locator(".nav-menu-button").click();
+  await page.getByRole("button", { name: "Reset demo" }).click();
+  await expect(page.getByText("Clear every check and decision?")).toBeVisible();
+  await page.locator(".nav-reset").getByRole("button", { name: "Reset", exact: true }).click();
+  await expect(page).toHaveURL(/#\/overview/);
+  const s = await (await request.get("/api/state")).json();
+  expect(s.status["CLM-2219"]).toBeUndefined();
+});

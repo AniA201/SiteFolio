@@ -325,6 +325,10 @@ footer{margin-top:64px;background:var(--g1);padding:40px 0}
 .nav-menu select { min-width: 0; border: 1px solid var(--line); border-radius: 5px; background: var(--paper); color: var(--ink); font: inherit; padding: 4px; }
 .nav-menu a { display: block; padding: 8px 6px; border-radius: 5px; text-decoration: none; font-size: 13px; }
 .nav-menu a:hover, .nav-menu a[aria-current] { background: var(--paper); color: var(--accent); }
+.nav-reset-open { display: block; width: 100%; text-align: left; margin-top: 6px; padding: 8px 6px; border: 0; border-top: 1px solid var(--line); border-radius: 0 0 5px 5px; background: none; color: var(--red); font: inherit; font-size: 13px; cursor: pointer; }
+.nav-reset-open:hover { background: var(--paper); }
+.nav-reset { display: grid; gap: 8px; margin-top: 6px; padding: 10px 6px 4px; border-top: 1px solid var(--line); font-size: 13px; }
+.nav-reset .btn { width: 100%; }
 .evidence-pin { top: 63px; }
 .story-art { position: relative; }
 .property-scene { position: absolute; inset: 0; }
