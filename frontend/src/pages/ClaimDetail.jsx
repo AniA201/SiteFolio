@@ -1,3 +1,4 @@
+import SolanaPanel from "../components/SolanaPanel";
 import { useState } from "react";
 import { BUILDINGS, PARTIES, PERSONAS, partyOf } from "../data";
 import { COL, Check, Flag, J, LAYER, SvcChip, Tag, WHO, aerialKind, fmt, isLayer, money, sqft } from "../lib";
@@ -215,6 +216,7 @@ function EvidenceTab({ S, c, step, done }) {
     checks: c.cross.map(x => ({ claim: x[0], verdict: x[4] })),
     decision: { status: o.status, [snake(o.a[0])]: o.a[1], [snake(o.b[0])]: o.b[1] },
     approved_by: S.review[c.id] || "waiting",
+    ...(c.solana?.state === "recorded" ? { solana: { transaction: c.solana.signature, signer: c.solana.signer, evidence_sha256: c.solana.sha256, released: !!c.solana.released } } : {}),
   };
   return (
     <section className="grid g12">
@@ -240,6 +242,7 @@ function EvidenceTab({ S, c, step, done }) {
           {done && <a className="small" style={{ textDecoration: "underline" }} href={`/api/claims/${c.id}/decision.json`}>Download JSON</a>}
           <button className="btn white sm" disabled={!done} onClick={() => window.open(`/api/claims/${c.id}/report`, "_blank", "noopener")}>Export report</button></div></div>
         <pre className="json" style={{ marginTop: 14, minHeight: 260 }}>{done ? J(record) : "// Run the agent to write the evidence file"}</pre>
+        <SolanaPanel c={c} wallet={window.phantom?.solana?.publicKey?.toString() || null} />
       </div>
     </section>
   );
@@ -260,7 +263,7 @@ export default function ClaimDetail({ S, A, id }) {
         <div className="row between" style={{ alignItems: "flex-end", marginTop: 10 }}>
           <div>
             <h1 className="h1">{c.title}</h1>
-            <div className="row wrap" style={{ marginTop: 14 }}><Tag s={st} />{c.agent?.live && <span className="tag t-running" title={Object.keys(c.agent.models || {}).join(", ")}>Live agent · free models</span>}<span className="muted">{p.name} ({p.role.toLowerCase()}) · {B.name}, {B.city} · <b style={{ color: "var(--ink)" }}>{fmt(c.amount)}</b></span></div>
+            <div className="row wrap" style={{ marginTop: 14 }}><Tag s={st} />{c.solana?.state === "recorded" && <a className="tag t-paid" href={c.solana.explorer} target="_blank" rel="noopener">On Solana ↗</a>}{c.agent?.live && <span className="tag t-running" title={Object.keys(c.agent.models || {}).join(", ")}>Live agent · free models</span>}<span className="muted">{p.name} ({p.role.toLowerCase()}) · {B.name}, {B.city} · <b style={{ color: "var(--ink)" }}>{fmt(c.amount)}</b></span></div>
           </div>
           <div className="row">
             <button className="btn gray" disabled={mine} onClick={() => A.reset(c.id)}>Reset</button>

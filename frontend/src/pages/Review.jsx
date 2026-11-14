@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { BUILDINGS, PARTIES, partyOf } from "../data";
 import { COL, Head, NEEDS, Tag, money } from "../lib";
 import EvidenceFolio from "../components/EvidenceFolio";
+import SolanaPanel from "../components/SolanaPanel";
+import { connectPhantom, disconnectPhantom, hasPhantom, signOnSolana, solanaStatus } from "../solana";
 
 const APPROVE_LABEL = {
   owner: c => c.outcome.status === "blocked" ? "Confirm block" : `Approve: pay ${money(c.outcome.a[1])}, hold ${money(c.outcome.b[1])}`,
@@ -13,10 +15,37 @@ export default function Review({ S, A }) {
   const cases = S.list.filter(c => NEEDS.includes(S.status[c.id]));
   const [sel, setSel] = useState(null);
   const [msg, setMsg] = useState({});
+  const [wallet, setWallet] = useState(() => window.phantom?.solana?.publicKey?.toString() || null);
+  const [signing, setSigning] = useState("");
+  const [solErr, setSolErr] = useState("");
+  // With Phantom connected, the approver signs the Solana transaction first; the decision is recorded only once it lands.
+  const decide = async (id, action) => {
+    setSolErr("");
+    if (!wallet) return A.decide(id, action);
+    setSigning(id);
+    try { await signOnSolana(id, { decision: action, wallet }); await A.decide(id, action); }
+    catch (e) { setSolErr(e.message || String(e)); }
+    finally { setSigning(""); }
+  };
+  const [chain, setChain] = useState(null);
+  useEffect(() => { solanaStatus().then(setChain).catch(() => setChain({ ready: false })); }, []);
+  const connect = async () => { setSolErr(""); try { setWallet(await connectPhantom()); } catch (e) { setSolErr(e.message); } };
+  const walletBox = (
+    <div className="sol-wallet">
+      {wallet ? <>
+        <span className="tag t-paid"><i />Phantom · {wallet.slice(0, 4)}…{wallet.slice(-4)} · devnet</span>
+        <button className="btn white sm" onClick={() => { disconnectPhantom(); setWallet(null); }}>Disconnect</button>
+      </> : <button className="btn gray sm" onClick={connect} title={hasPhantom() ? "" : "Install Phantom and switch it to Devnet"}>Connect Phantom to sign</button>}
+      {chain && (chain.ready
+        ? <a className="text-link small" href={chain.explorer_wallet} target="_blank" rel="noopener" title={`App wallet ${chain.app_wallet} · ${chain.sol} SOL (devnet test SOL, pays the fees)`}>All receipts on Solana ↗</a>
+        : <a className="text-link small" style={{ color: "var(--red)" }} href="https://faucet.solana.com" target="_blank" rel="noopener"
+            title={chain.app_wallet ? `Fund ${chain.app_wallet} on Devnet` : ""}>Solana wallet needs free devnet SOL ↗</a>)}
+    </div>
+  );
   const cur = cases.find(c => c.id === sel) || cases[0];
   return (
     <div className="wrapx">
-      <Head over="Human in the loop" title="Review" lede="The agent never moves money or decides rent on its own. It pauses here with the proof, and a person decides." />
+      <Head over="Human in the loop" title="Review" lede="The agent never moves money or decides rent on its own. It pauses here with the proof, and a person decides. Each decision is signed and recorded on Solana." right={walletBox} />
       {!cur && (
         <div className="tile">
           <h4>Nothing to review yet</h4>
@@ -50,13 +79,17 @@ export default function Review({ S, A }) {
               {S.review[cur.id] ? <>
                 <Tag s={S.review[cur.id]} />
                 <span className="muted small">Recorded. The agent resumed and logged it.</span>
-                <button className="btn white sm" onClick={() => A.decide(cur.id, null)}>Undo</button>
+                {cur.solana?.state === "recorded" || cur.solana?.state === "pending"
+                  ? <span className="muted small">Permanent: it's on Solana.</span>
+                  : <button className="btn white sm" onClick={() => A.decide(cur.id, null)}>Undo</button>}
               </> : <>
-                <button className="btn black sm" onClick={() => A.decide(cur.id, "ok")}>{APPROVE_LABEL[cur.persona](cur)}</button>
-                {cur.outcome.note && <button className="btn amber sm" onClick={() => A.decide(cur.id, "sent")}>Send message</button>}
-                <button className="btn white sm" onClick={() => A.decide(cur.id, "rejected")}>Reject</button>
+                <button className="btn black sm" disabled={!!signing} onClick={() => decide(cur.id, "ok")}>{signing === cur.id ? "Sign in Phantom…" : APPROVE_LABEL[cur.persona](cur)}</button>
+                {cur.outcome.note && <button className="btn amber sm" disabled={!!signing} onClick={() => decide(cur.id, "sent")}>Send message</button>}
+                <button className="btn white sm" disabled={!!signing} onClick={() => decide(cur.id, "rejected")}>Reject</button>
               </>}
             </div>
+            {solErr && <p className="small" style={{ color: "var(--red)", marginTop: 10 }}>{solErr}</p>}
+            <SolanaPanel c={cur} wallet={wallet} />
           </div>
         </div>
       )}

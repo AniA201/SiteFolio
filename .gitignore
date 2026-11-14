@@ -17,3 +17,6 @@ backend/app/data/AGENTS.md
 *.zip
 backend/app/data/real/
 backend/app/data/agent_memory.json
+
+# Solana devnet wallets (secret keys)
+backend/app/data/solana/

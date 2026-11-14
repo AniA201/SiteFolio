@@ -20,6 +20,8 @@ from .routes_data import router as data_router
 from .routes_report import router as report_router
 from .routes_intake import router as intake_router
 from .routes_kit import router as kit_router
+from .routes_solana import after_decision as solana_after_decision
+from .routes_solana import router as solana_router
 from .settings import settings
 from .tiger import TigerHistory
 
@@ -168,7 +170,12 @@ def run(cid: str):
 
 @app.post("/api/claims/{cid}/reset")
 def reset(cid: str):
-    _claim_or_404(cid)
+    claim = _claim_or_404(cid)
+    if engine.current != cid:
+        claim.pop("solana", None)  # the chain keeps its receipt; the demo starts the claim fresh
+        claim.pop("sealed_files", None)
+        if "untampered_lines" in claim:
+            claim["lines"] = claim.pop("untampered_lines")
     engine.reset(cid)
     return engine.snapshot()
 
@@ -185,6 +192,7 @@ def decision(cid: str, body: Decision):
     claim = _claim_or_404(cid)
     engine.decide(cid, body.action)
     tiger.record(cid, claim["persona"], "decision", {"action": body.action})
+    solana_after_decision(engine, cid, body.action)  # public receipt on Solana devnet, in the background
     return engine.snapshot()
 
 
@@ -205,6 +213,7 @@ def reset_everything():
 
 
 app.include_router(data_router)
+app.include_router(solana_router)
 app.include_router(report_router)
 app.include_router(intake_router)
 app.include_router(kit_router)
