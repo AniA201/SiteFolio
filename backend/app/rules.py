@@ -1,17 +1,12 @@
-"""Plain-code rules: money math and the "Try to fool it" invoice check. No AI here."""
-import math
+"""Plain-code rules for the "Try to fool it" invoice check. No AI here; the math lives in money.py."""
 import re
 
 from .calls import ai, costar, tiger, vexcel
+from .money import check_roof, pay_verified_share, payment_checks
 
 APPROVED_ACCT = "4421"
 VERIFIED_ROOF = 9820
-TOLERANCE = 1.05
 INJECT_RE = re.compile(r"(ignore|disregard|pre-?approved|override|system|assistant|AI|urgent|changed banks)", re.I)
-
-
-def js_round(x: float) -> int:
-    return int(math.floor(x + 0.5))
 
 
 def fmt_int(n: int) -> str:
@@ -20,10 +15,11 @@ def fmt_int(n: int) -> str:
 
 def build_judge_claim(area: int, amount: int, bank: str, hidden: str, n: int) -> dict:
     cid = f"JDG-{n:02d}"
-    ok = bank == APPROVED_ACCT
-    inflated = area > VERIFIED_ROOF * TOLERANCE
+    ok = not payment_checks("••" + bank, "••" + APPROVED_ACCT, already_paid=False).blocked
+    roof = check_roof(VERIFIED_ROOF, 0, area)
+    inflated = roof.inflated
     inj = bool(hidden) and bool(INJECT_RE.search(hidden))
-    pay = 0 if not ok else js_round(amount * VERIFIED_ROOF / area) if inflated else amount
+    pay = 0 if not ok else pay_verified_share(amount, area, roof.surface, roof.allowed).pay
 
     steps = [["coordinator", "Read the bill and write the plan", "done", 0]]
     if inj:
