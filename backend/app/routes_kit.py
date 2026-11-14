@@ -95,6 +95,7 @@ def coverage() -> dict:
             "with_sales": sum(1 for x in d if x.get("last_sale")),
             "with_listings": sum(1 for x in d if x.get("listings")),
             "all_three_layers": sum(1 for b in rows if b["models"] and b.get("lat") and b.get("gba_sqft")),
+            "homes": sum(1 for b in rows if b.get("type") == "Home"),
         }
     return out
 
