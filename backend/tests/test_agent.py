@@ -199,3 +199,12 @@ def test_draws_are_never_blocked_and_need_the_release_math():
 def test_draw_release_rejects_swapped_arguments():
     assert "error" in json.loads(T.compute_draw_release(600000, 10, 600000))
     assert json.loads(T.compute_draw_release(600000, 10, 13)) == {"release": 461538, "hold": 138462}
+
+
+def test_cloud_without_ollama_falls_back_across_free_groq_models(monkeypatch):
+    from app.agent import models as M
+    monkeypatch.setattr(M, "ollama_ready", lambda: False)
+    import dataclasses
+    monkeypatch.setattr(M, "settings", dataclasses.replace(M.settings, groq_api_key="test-key"))
+    m = M.free_model("coordinator")
+    assert m.patient and len(m.names) == len(set(M.ROLE_GROQ_MODEL.values())) and m.names[0].endswith(M.ROLE_GROQ_MODEL["coordinator"])

@@ -1,0 +1,23 @@
+[Unit]
+Description=Plumbline (FastAPI app and built frontend)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=plumbline
+Group=plumbline
+WorkingDirectory=/opt/plumbline
+EnvironmentFile=/etc/plumbline.env
+# One worker on purpose: claims, live runs and Review state live in this process's memory.
+ExecStart=/opt/plumbline/backend/.venv/bin/uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8787 --workers 1 --proxy-headers --forwarded-allow-ips 127.0.0.1
+Restart=always
+RestartSec=3
+# Hardening: the app only needs its own folder.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/plumbline/backend/app/data
+
+[Install]
+WantedBy=multi-user.target

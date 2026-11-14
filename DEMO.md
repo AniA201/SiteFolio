@@ -37,6 +37,13 @@ Run DRW-0412 so it waits in Review (Lender view). Keep the Explorer tab ready.
 
 If Phantom misbehaves, disconnect it: the same flow runs with the demo lender key.
 
+## Vultr (cloud) version
+- Live at https://66-135-21-65.sslip.io (password in `backend/.env` as SITE_PASSWORD). Judges can scan the phone page's
+  QR from anywhere.
+- On the free models, start live runs one at a time and a minute apart; back-to-back runs hit Groq's per-minute limit
+  and can take several minutes. The laptop (with Ollama) is the faster backup.
+- Phantom on the cloud site: same steps as on the laptop; the site is HTTPS.
+
 ## Numbers to have ready
 - 5,245 properties in the CoStar kit, 99% checkable against all three layers; 15,092 Matterport scans.
 - Live evaluation: the agent's decisions match the plain-code rules on the demo claims (`python -m scripts.eval_agent`).
