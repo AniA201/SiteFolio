@@ -4,6 +4,7 @@ Writes go through one background thread and one reused connection, so a check ne
 are appended in order, and each claim's latest state is coalesced and saved about once a second.
 """
 import logging
+import os
 import queue
 import re
 import threading
@@ -75,6 +76,8 @@ class TigerHistory:
         self._wake = threading.Event()
         self._writer = None
         self._db = None
+        # The laptop and the cloud server can share one database: each keeps its own saved claims, the event history is shared.
+        self.instance = os.getenv("PLUMBLINE_HOST", "laptop")
 
     @property
     def enabled(self):
@@ -155,7 +158,7 @@ class TigerHistory:
                         VALUES (%s,%s,%s,%s,%s,%s)
                         ON CONFLICT (claim_id) DO UPDATE SET claim=EXCLUDED.claim, status=EXCLUDED.status,
                         steps=EXCLUDED.steps, review=EXCLUDED.review, retry=EXCLUDED.retry, updated_at=now()""",
-                                (claim["id"], Jsonb(claim), status, steps, review, retry))
+                                (f"{self.instance}:{claim['id']}", Jsonb(claim), status, steps, review, retry))
         except Exception:
             for e in events:  # keep them for the next try
                 self._events.put(e)
@@ -168,7 +171,8 @@ class TigerHistory:
         if not self.enabled:
             return []
         with connect(self.url, row_factory=dict_row) as db:
-            return db.execute("SELECT claim, status, steps, review, retry FROM claim_state ORDER BY updated_at").fetchall()
+            return db.execute("SELECT claim, status, steps, review, retry FROM claim_state WHERE claim_id LIKE %s ORDER BY updated_at",
+                              (f"{self.instance}:%",)).fetchall()
 
     def clear_claims(self):
         if not self.enabled:
@@ -176,7 +180,7 @@ class TigerHistory:
         with self._lock:
             self._claims.clear()
         with connect(self.url) as db:
-            db.execute("DELETE FROM claim_state")
+            db.execute("DELETE FROM claim_state WHERE claim_id LIKE %s", (f"{self.instance}:%",))
 
     def active_surcharges(self, property_id, work):
         if not self.enabled:
