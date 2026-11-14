@@ -10,3 +10,8 @@ __pycache__/
 .claude/
 !.env.example
 .pytest_cache/
+
+# Hackathon data (licensed for the event only)
+backend/app/data/models_index.csv
+backend/app/data/AGENTS.md
+*.zip
