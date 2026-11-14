@@ -51,3 +51,43 @@ def test_non_image_reply_is_an_error():
 def test_missing_key():
     with pytest.raises(VexcelError, match="VEXCEL_API_KEY"):
         VexcelClient("")
+
+
+PROPERTY = {"features": [{"properties": {
+    "metadata.collection": "us-tx-cypress-2026", "request-information.inside-parcel": True, "structure.count": 2,
+    "structures": [
+        {"primary-structure": True, "footprint.area": 74416.2, "roof-characteristics.shape.value": "flat",
+         "roof-characteristics.material.class": "gravel", "roof-characteristics.condition": 2.0,
+         "roof-characteristics.condition.precise-value": 2.31, "roof-objects.ac-unit.count": 26, "building-type.class": "commercial"},
+        {"primary-structure": False, "footprint.area": 1200.0, "roof-objects.ac-unit.count": None},
+    ]}}]}
+
+
+def test_property_facts():
+    seen = []
+
+    def handler(req):
+        seen.append(req)
+        return httpx.Response(200, json=PROPERTY)
+    facts = VexcelClient("k", http=httpx.Client(transport=httpx.MockTransport(handler))).property(29.8502572, -95.5340642)
+    assert seen[0].url.params["wkt"] == "POINT(-95.5340642 29.8502572)"  # longitude first
+    assert seen[0].url.params["unit-system"] == "imperial"
+    p = facts.primary
+    assert (p.footprint_sqft, p.roof_shape, p.roof_material, p.roof_condition, p.ac_units) == (74416.2, "flat", "gravel", 2.31, 26)
+    assert facts.total_footprint_sqft == 75616.2 and facts.total_ac_units == 26
+
+
+def test_property_404_means_no_parcel():
+    c = VexcelClient("k", http=httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(404, json={}))))
+    assert c.property(29.7, -95.4) is None
+
+
+def test_rate_limit_retried_with_backoff():
+    calls, slept = [], []
+
+    def handler(req):
+        calls.append(1)
+        return httpx.Response(429) if len(calls) < 3 else httpx.Response(200, json=PROPERTY)
+    c = VexcelClient("k", http=httpx.Client(transport=httpx.MockTransport(handler)), sleep=slept.append)
+    assert c.property(29.85, -95.53).primary.ac_units == 26
+    assert len(calls) == 3 and len(slept) == 2 and 1 <= slept[0] < 2 and 2 <= slept[1] < 3

@@ -78,5 +78,6 @@ Production: `npm run build` in `frontend/`, then the backend serves `frontend/di
 | GET | `/api/data/matterport/models/{id}` | Model basics |
 | GET | `/api/data/matterport/models/{id}/rooms` | Rooms with labels and areas in sq ft |
 | GET | `/api/data/vexcel/ortho.jpg` | `lat, lon, half_side_m, pixels` aerial image |
+| GET | `/api/data/vexcel/property` | `lat, lon` footprint, roof shape/material/condition, rooftop AC count |
 
 All buildings, parties and numbers are sample data.

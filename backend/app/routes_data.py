@@ -64,3 +64,21 @@ def vexcel_ortho(lat: float, lon: float, half_side_m: float = Query(70, gt=5, le
     except VexcelError as e:
         raise HTTPException(502, str(e))
     return Response(img, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+
+
+@router.get("/vexcel/property")
+def vexcel_property(lat: float, lon: float):
+    """Footprint, roof shape/material/condition and counted roof objects (AC units) for the parcel at a point."""
+    if not settings.vexcel_api_key:
+        raise HTTPException(503, "Vexcel API key is not set (VEXCEL_API_KEY).")
+    try:
+        facts = VexcelClient(settings.vexcel_api_key).property(lat, lon)
+    except VexcelError as e:
+        raise HTTPException(502, str(e))
+    if facts is None:
+        raise HTTPException(404, "Vexcel has no parcel at this point. Nudge it onto the roof.")
+    p = facts.primary
+    return {"collection": facts.collection, "inside_parcel": facts.inside_parcel,
+            "total_footprint_sqft": round(facts.total_footprint_sqft), "total_ac_units": facts.total_ac_units,
+            "primary": None if p is None else {k: getattr(p, k) for k in p.__dataclass_fields__},
+            "structures": len(facts.structures)}
