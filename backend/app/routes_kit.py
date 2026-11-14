@@ -77,6 +77,35 @@ def roof_basis(v: dict, plate: float | None) -> tuple[int, str, int | None]:
     return sqft, basis, round(abs(sqft / plate - 1) * 100)
 
 
+@lru_cache(maxsize=1)
+def coverage() -> dict:
+    """How much of the kit each layer covers: what can be checked from data, by city."""
+    index, dossiers = kit()
+    out = {}
+    for city in ("Houston", "Los Angeles", None):
+        rows = [b for b in index if city is None or b["city"] == city]
+        d = [dossiers.get(b["id"], {}) for b in rows]
+        out[city or "All"] = {
+            "buildings": len(rows),
+            "with_location": sum(1 for b in rows if b.get("lat") and b.get("lon")),
+            "with_scans": sum(1 for b in rows if b["models"]),
+            "scans": sum(b["models"] for b in rows),
+            "with_rents": sum(1 for x in d if x.get("apartments")),
+            "with_tenants": sum(1 for x in d if x.get("tenants")),
+            "with_sales": sum(1 for x in d if x.get("last_sale")),
+            "with_listings": sum(1 for x in d if x.get("listings")),
+            "all_three_layers": sum(1 for b in rows if b["models"] and b.get("lat") and b.get("gba_sqft")),
+        }
+    return out
+
+
+@router.get("/coverage")
+def coverage_route():
+    if not kit()[0]:
+        raise HTTPException(503, "The CoStar kit index isn't built yet. Run: python -m app.real.kit_index")
+    return coverage()
+
+
 @router.get("/search")
 def search_route(q: str = "", city: str | None = None, type: str | None = None, scanned: bool = False, limit: int = Query(25, ge=1, le=100)):
     if not kit()[0]:
