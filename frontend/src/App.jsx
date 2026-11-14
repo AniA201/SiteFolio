@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PERSONAS } from "./data";
+import { META, PERSONAS } from "./data";
 import { Flag, NEEDS } from "./lib";
 import { api } from "./api";
 import { useBackend } from "./useBackend";
@@ -78,7 +78,7 @@ export default function App() {
       {state.rev >= 0 && body}
       <footer><div className="wrapx row between wrap">
         <span className="small muted">PLUMBLINE · Check the paper against the building · CoStar · Vexcel · Matterport · deepagents · Tiger Data · Vultr</span>
-        <Flag t="All buildings, parties and numbers are sample data" />
+        <Flag t={META.data_note || "All buildings, parties and numbers are sample data"} />
       </div></footer>
     </div>
   );

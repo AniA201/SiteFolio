@@ -3,6 +3,7 @@ export const BUILDINGS = {};
 export const PARTIES = {};
 export const PERSONAS = {};
 export const SURCHARGES = [];
+export const META = { real: false, stories: null, fool: null, data_note: null };
 
 export async function loadMeta() {
   const res = await fetch("/api/meta");
@@ -12,4 +13,5 @@ export async function loadMeta() {
   Object.assign(PARTIES, m.parties);
   Object.assign(PERSONAS, m.personas);
   SURCHARGES.push(...m.surcharges);
+  Object.assign(META, m.meta || {}, { real: !!m.real });
 }

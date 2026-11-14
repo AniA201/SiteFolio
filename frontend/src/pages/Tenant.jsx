@@ -51,12 +51,12 @@ export default function Tenant({ S, A, id }) {
           {hasScan && (
             <div className="tile" style={{ padding: 0, overflow: "hidden" }}>
               <FloorPlan show mode="apt" />
-              <div style={{ padding: 18 }}><b>Hallways, measured inside:</b> 1,920 sq ft</div>
+              <div style={{ padding: 18 }}><b>{c.tenant?.inside_label || "Hallways, measured inside"}:</b> {c.tenant?.inside_value || "1,920 sq ft"}</div>
             </div>
           )}
         </div>
       </div>
-      <div style={{ marginTop: 16 }}><Flag t="Sample building · plain-language page, not legal advice" /></div>
+      <div style={{ marginTop: 16 }}><Flag t={B.real ? "Real building and measurements · sample application · not legal advice" : "Sample building · plain-language page, not legal advice"} /></div>
     </div>
   );
 }
