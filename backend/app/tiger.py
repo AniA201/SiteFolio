@@ -1,4 +1,6 @@
 """Tiger Cloud event history and surcharge registry."""
+from time import perf_counter
+
 from psycopg import connect
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
@@ -111,12 +113,14 @@ class TigerHistory:
     def dashboard(self, persona):
         if not self.enabled:
             return {"connected": False, "events": 0, "weekly": [], "surcharges": [], "recent": []}
+        started = perf_counter()
         with connect(self.url, row_factory=dict_row) as db:
             events = db.execute("SELECT count(*) AS n FROM history_events").fetchone()["n"]
             weekly = db.execute("SELECT week, events, paid, held FROM history_weekly WHERE persona=%s ORDER BY week DESC LIMIT 7", (persona,)).fetchall()
             surcharges = db.execute("SELECT property_id, building, work, approved, ends, per_unit FROM surcharge_registry ORDER BY approved DESC").fetchall()
-            recent = db.execute("SELECT at, claim_id, kind, detail FROM history_events WHERE persona=%s ORDER BY at DESC, id DESC LIMIT 12", (persona,)).fetchall()
+            recent = db.execute("SELECT at, claim_id, kind, detail FROM history_events WHERE persona=%s ORDER BY at DESC, id DESC LIMIT 60", (persona,)).fetchall()
         return {"connected": True, "events": events,
+                "query_ms": round((perf_counter() - started) * 1000, 1),
                 "weekly": [{**row, "week": row["week"].isoformat(), "paid": float(row["paid"]), "held": float(row["held"])} for row in weekly],
                 "surcharges": [{**row, "approved": row["approved"].isoformat(), "ends": row["ends"].isoformat(), "per_unit": float(row["per_unit"])} for row in surcharges],
                 "recent": [{**row, "at": row["at"].isoformat()} for row in recent]}

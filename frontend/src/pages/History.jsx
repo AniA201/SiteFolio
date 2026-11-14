@@ -35,10 +35,22 @@ export default function History({ S, A }) {
       .some(value => value?.toLowerCase().includes(search))
   ));
   const counts = { all: events.length, flagged: flags.length, registry: surchargeRows.length };
+  const weekly = [...(history?.weekly || [])].reverse();
+  const weeklyMax = Math.max(1, ...weekly.map(row => Number(row.events)));
 
   return (
     <div className="wrapx history">
       <Head title="History" lede="Find a past check, follow a flag, or look up a registered surcharge." />
+      {history?.connected && <section className="tile" aria-label="Tiger Cloud activity by week" style={{ marginBottom: 24 }}>
+        <div className="row between wrap"><h4>Stored activity by week</h4><span className="muted small">{history.events.toLocaleString()} events · dashboard query {history.query_ms} ms</span></div>
+        {weekly.length ? <div style={{ display: "flex", alignItems: "flex-end", gap: 12, height: 160, marginTop: 20 }}>
+          {weekly.map(row => <div key={row.week} style={{ flex: 1, textAlign: "center", height: "100%", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+            <span className="small num">{row.events}</span>
+            <div style={{ height: `${Math.max(4, Number(row.events) / weeklyMax * 110)}px`, background: "var(--amber)", borderRadius: "5px 5px 0 0" }} />
+            <span className="small muted">{new Date(row.week).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+          </div>)}
+        </div> : <p className="muted small">No weekly events recorded yet.</p>}
+      </section>}
       <div className="history-toolbar">
         <div className="history-filters" role="group" aria-label="History view">
           {VIEWS.map(([key, label]) => <button type="button" key={key} aria-pressed={view === key} onClick={() => { setView(key); setQuery(""); }}>{label} <span>{counts[key]}</span></button>)}

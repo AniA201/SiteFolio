@@ -6,6 +6,7 @@ import asyncio
 import json
 from contextlib import asynccontextmanager
 from pathlib import Path
+from datetime import date
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Request
@@ -59,6 +60,16 @@ class JudgeBill(BaseModel):
     hidden: str = Field(default="", max_length=2000)
 
 
+class SurchargeEntry(BaseModel):
+    property_id: str = Field(min_length=1, max_length=100)
+    building: str = Field(min_length=1, max_length=200)
+    work: str = Field(min_length=1, max_length=100)
+    approved: date
+    ends: date
+    per_unit: float = Field(ge=0)
+    source_claim_id: str = Field(min_length=1, max_length=100)
+
+
 def _claim_or_404(cid: str) -> dict:
     claim = engine.find(cid)
     if not claim:
@@ -89,6 +100,25 @@ def state():
 @app.get("/api/history/{persona}")
 def history(persona: Literal["owner", "reviewer", "lender"]):
     return tiger.dashboard(persona)
+
+
+@app.post("/api/history/surcharges")
+def register_surcharge(body: SurchargeEntry):
+    if not tiger.enabled:
+        raise HTTPException(503, "Tiger Cloud is not configured")
+    if body.ends < body.approved:
+        raise HTTPException(422, "End date must follow approval date")
+    claim = _claim_or_404(body.source_claim_id)
+    if claim["persona"] != "reviewer" or engine.review.get(claim["id"]) != "ok":
+        raise HTTPException(409, "An approved reviewer decision is required")
+    building = BUILDINGS.get(claim.get("b"))
+    if not building or building.get("cs") != body.property_id:
+        raise HTTPException(409, "Property does not match the approved claim")
+    tiger.register_surcharge(body.property_id, body.building, body.work,
+                             body.approved, body.ends, body.per_unit, body.source_claim_id)
+    tiger.record(claim["id"], "reviewer", "surcharge_registered",
+                 {"property_id": body.property_id, "work": body.work})
+    return tiger.dashboard("reviewer")
 
 
 @app.get("/api/stream")
