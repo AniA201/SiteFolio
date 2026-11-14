@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from .engine import Engine
 from .fixtures import BUILDINGS, PARTIES, PERSONAS, SURCHARGES
+from .settings import settings
 
 engine: Engine
 
@@ -60,7 +61,7 @@ def _claim_or_404(cid: str) -> dict:
 # ---------- read ----------
 @app.get("/api/health")
 def health():
-    return {"ok": True}
+    return {"ok": True, "integrations": settings.integrations()}
 
 
 @app.get("/api/meta")
