@@ -2,15 +2,22 @@
 
 One call clips Vexcel's latest orthophoto (about 7.5 cm per pixel) to a square around a lat/lon. The key goes in
 the X-API-KEY header. Hackathon keys cover Houston and Los Angeles only; anywhere else answers 403.
-Roof attributes, obliques and object detection come from Vexcel's own tutorial (linked from the keys card).
+property/extract adds the parcel and, per structure, footprint area, roof shape, material, condition and counted
+roof objects such as AC units. Rate limits (429) are retried with backoff, as the Vexcel tutorial asks.
 """
 from __future__ import annotations
 
 import math
+import random
+import time
+from dataclasses import dataclass
 
 import httpx
 
-ORTHO_URL = "https://api.vexcelgroup.com/v2/ortho/extract"
+API = "https://api.vexcelgroup.com/v2"
+ORTHO_URL = f"{API}/ortho/extract"
+PROPERTY_URL = f"{API}/property/extract"
+MAX_RETRIES = 5
 DEFAULT_LAYER = "urban,urban-r,wide-area,urban-g"
 M_PER_DEG_LAT = 111320.0
 
@@ -33,11 +40,12 @@ def metres_per_pixel(half_side_m: float, pixels: int) -> float:
 
 
 class VexcelClient:
-    def __init__(self, api_key: str, http: httpx.Client | None = None, timeout: float = 60):
+    def __init__(self, api_key: str, http: httpx.Client | None = None, timeout: float = 120, sleep=time.sleep):
         if not api_key:
             raise VexcelError("Vexcel API key is not set (VEXCEL_API_KEY).")
         self._key = api_key
         self._http = http or httpx.Client(timeout=timeout)
+        self._sleep = sleep
 
     def ortho(self, lat: float, lon: float, half_side_m: float = 70, pixels: int = 1400, layer: str = DEFAULT_LAYER) -> bytes:
         body = {
@@ -49,12 +57,82 @@ class VexcelClient:
             "destination-dimensions": f"{pixels},{pixels}",
             "attribution": "false",
         }
-        res = self._http.post(ORTHO_URL, json=body, headers={"X-API-KEY": self._key})
+        res = self._send("POST", ORTHO_URL, json=body)
+        self._check(res)
+        if not res.headers.get("content-type", "").startswith("image/"):
+            raise VexcelError(f"Vexcel answered {res.headers.get('content-type')} instead of an image: {res.text[:200]}")
+        return res.content
+
+    def property(self, lat: float, lon: float) -> "PropertyFacts | None":
+        """The parcel at a point with its structures: footprint, roof shape and material, counted roof objects.
+        None when Vexcel has no parcel there (HTTP 404)."""
+        res = self._send("GET", PROPERTY_URL, params={
+            "wkt": f"POINT({lon!r} {lat!r})", "srid": 4326, "layer": DEFAULT_LAYER,
+            "latest": "true", "include": "precomputed", "unit-system": "imperial"})
+        if res.status_code == 404:
+            return None
+        self._check(res)
+        features = res.json().get("features") or []
+        return parse_property(features[0]["properties"]) if features else None
+
+    def _send(self, method: str, url: str, **kwargs) -> httpx.Response:
+        """Retry 429 Too Many Requests with exponential backoff (about 1, 2, 4, 8, 16 s), as Vexcel asks."""
+        for attempt in range(MAX_RETRIES + 1):
+            res = self._http.request(method, url, headers={"X-API-KEY": self._key}, **kwargs)
+            if res.status_code != 429 or attempt == MAX_RETRIES:
+                return res
+            self._sleep(min(2 ** attempt, 30) + random.random())
+        return res
+
+    @staticmethod
+    def _check(res: httpx.Response) -> None:
         if res.status_code == 403:
             raise VexcelError("Vexcel refused this location (HTTP 403). Hackathon keys cover Houston and Los Angeles only.")
         if res.status_code == 401:
             raise VexcelError("Vexcel rejected the key (HTTP 401).")
+        if res.status_code == 429:
+            raise VexcelError("Vexcel is rate limiting us (HTTP 429); try again in a minute.")
         res.raise_for_status()
-        if not res.headers.get("content-type", "").startswith("image/"):
-            raise VexcelError(f"Vexcel answered {res.headers.get('content-type')} instead of an image: {res.text[:200]}")
-        return res.content
+
+
+@dataclass(frozen=True)
+class Structure:
+    primary: bool
+    footprint_sqft: float | None
+    roof_shape: str | None        # flat, gable, hip, ...
+    roof_material: str | None
+    roof_condition: float | None  # Vexcel's condition score (precise value when given)
+    ac_units: int | None
+    building_type: str | None
+
+
+@dataclass(frozen=True)
+class PropertyFacts:
+    collection: str | None
+    inside_parcel: bool | None
+    structures: list[Structure]
+
+    @property
+    def primary(self) -> Structure | None:
+        return next((s for s in self.structures if s.primary), self.structures[0] if self.structures else None)
+
+    @property
+    def total_footprint_sqft(self) -> float:
+        return sum(s.footprint_sqft or 0 for s in self.structures)
+
+    @property
+    def total_ac_units(self) -> int:
+        return sum(s.ac_units or 0 for s in self.structures)
+
+
+def parse_property(attrs: dict) -> PropertyFacts:
+    structures = [Structure(
+        primary=bool(s.get("primary-structure")),
+        footprint_sqft=s.get("footprint.area"),
+        roof_shape=s.get("roof-characteristics.shape.value"),
+        roof_material=s.get("roof-characteristics.material.class"),
+        roof_condition=s.get("roof-characteristics.condition.precise-value", s.get("roof-characteristics.condition")),
+        ac_units=s.get("roof-objects.ac-unit.count"),
+        building_type=s.get("building-type.class"),
+    ) for s in attrs.get("structures") or []]
+    return PropertyFacts(attrs.get("metadata.collection"), attrs.get("request-information.inside-parcel"), structures)
