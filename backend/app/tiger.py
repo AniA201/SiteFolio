@@ -86,13 +86,18 @@ class TigerHistory:
     def initialize(self):
         if not self.enabled:
             return
-        with connect(self.url, autocommit=True) as db:
-            for statement in SCHEMA:
-                try:
-                    db.execute(statement)
-                except Exception as e:  # e.g. compression already set up with other options: keep going
-                    log.warning("Tiger schema step skipped: %s", str(e)[:160])
-            self._seed_registry(db)
+        try:
+            with connect(self.url, autocommit=True, connect_timeout=10) as db:
+                for statement in SCHEMA:
+                    try:
+                        db.execute(statement)
+                    except Exception as e:  # e.g. compression already set up with other options: keep going
+                        log.warning("Tiger schema step skipped: %s", str(e)[:160])
+                self._seed_registry(db)
+        except Exception as e:  # wrong password or Tiger down: run without history instead of not starting at all
+            log.error("Tiger Cloud unreachable, running without it: %s", str(e).splitlines()[0][:200])
+            self.url = ""
+            return
         self._writer = threading.Thread(target=self._write_loop, name="tiger-writer", daemon=True)
         self._writer.start()
 

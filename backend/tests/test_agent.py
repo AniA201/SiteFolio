@@ -244,3 +244,10 @@ def test_rules_keep_the_rent_amount_when_the_agent_used_the_wrong_cost():
         call("record_decision", {"claim_id": cid, "status": "reduced", "reason": "Reduced."}, 2),
     ])
     assert out.get("overruled") and out["b"] == c["outcome"]["b"]
+
+
+def test_app_starts_without_tiger_when_it_cannot_connect():
+    from app.tiger import TigerHistory
+    t = TigerHistory("postgresql://nobody:wrong@127.0.0.1:1/none")
+    t.initialize()  # must not raise
+    assert not t.enabled
