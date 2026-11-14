@@ -89,10 +89,10 @@ class Facts:
         for mid in mids:
             m = self.models[mid]
             out.append({"model": mid, "name": m["name"], "rooms": [
-                {"label": r.label, **({"areaFloor_m2": round(r.area_sqm, 2)} if r.area_sqm else {})} for r in m["rooms"]],
+                {"id": r.id, "label": r.label, **({"areaFloor_m2": round(r.area_sqm, 2)} if r.area_sqm else {})} for r in m["rooms"]],
                 "total_sq_ft": round(total_sqft(m["rooms"]))})
         req = ("POST /api/models/graph   (GraphQL, server-side)\nquery Rooms($id: ID!) {\n  model(id: $id) {\n    rooms {\n"
-               "      classifications { label }\n      dimensions(units: metric) { areaFloor }\n    }\n  }\n}"
+               "      id\n      classifications { label }\n      dimensions(units: metric) { areaFloor }\n    }\n  }\n}"
                + (f"\n# {note}" if note else ""))
         return {"svc": "Matterport", "who": "interior", "title": "Look inside", "req": req, "resp": J(out if len(out) > 1 else out[0])}
 
