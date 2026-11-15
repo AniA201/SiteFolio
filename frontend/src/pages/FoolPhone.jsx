@@ -12,7 +12,9 @@ export default function FoolPhone({ S, A }) {
   const done = c && FINAL.includes(S.status[c.id]);
   const submit = bill => {
     setError("");
-    A.judgeHere(bill).then(setMine).catch(() => setError("Couldn't send the bill. Check the connection and try again."));
+    A.judgeHere(bill).then(setMine).catch(e => setError(/422/.test(String(e?.message || e))
+      ? "That bill has a number that's too big or a note that's too long. Try smaller numbers."
+      : "Couldn't send the bill. Check the connection and try again."));
   };
 
   return (

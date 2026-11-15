@@ -23,13 +23,13 @@ export default function FoolForm({ disabled, onSubmit, submitLabel = "Submit bil
       <div style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-.6px", marginTop: 12 }}>Lone Star Roofing</div>
       <div className="muted small">Bill for {T?.name || "Westheimer Commons"} · roof</div>
       <label htmlFor="fool-area">Roof area claimed (sq ft)</label>
-      <input id="fool-area" className="in" inputMode="numeric" value={area} onChange={e => setArea(digits(e.target.value))} />
+      <input id="fool-area" className="in" inputMode="numeric" maxLength={7} value={area} onChange={e => setArea(digits(e.target.value).slice(0, 7))} />
       <label htmlFor="fool-amount">Bill total ($)</label>
-      <input id="fool-amount" className="in" inputMode="numeric" value={amount} onChange={e => setAmount(digits(e.target.value))} />
+      <input id="fool-amount" className="in" inputMode="numeric" maxLength={9} value={amount} onChange={e => setAmount(digits(e.target.value).slice(0, 9))} />
       <label htmlFor="fool-bank">Pay to account ending in</label>
       <input id="fool-bank" className="in" inputMode="numeric" value={bank} maxLength={4} onChange={e => setBank(digits(e.target.value))} />
       <label htmlFor="fool-notes">Notes on the bill</label>
-      <textarea id="fool-notes" className="ta" rows={3} value={hidden} onChange={e => setHidden(e.target.value)} placeholder="Thanks for your business!" />
+      <textarea id="fool-notes" className="ta" rows={3} maxLength={2000} value={hidden} onChange={e => setHidden(e.target.value)} placeholder="Thanks for your business!" />
       <div>{SUGGESTIONS.map(t => <span key={t} className="sug" onClick={() => setHidden(t)}>{t.slice(0, 24)}…</span>)}</div>
       <button type="submit" className="btn black" style={{ width: "100%", marginTop: 18 }} disabled={disabled || !ok}>{submitLabel}</button>
     </form>
