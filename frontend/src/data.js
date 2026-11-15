@@ -7,7 +7,7 @@ export const META = { real: false, stories: null, fool: null, data_note: null };
 
 export async function loadMeta() {
   const res = await fetch("/api/meta");
-  if (!res.ok) throw new Error("Could not reach the Plumbline API");
+  if (!res.ok) throw new Error("Could not reach SiteFolio");
   const m = await res.json();
   Object.assign(BUILDINGS, m.buildings);
   Object.assign(PARTIES, m.parties);

@@ -1,4 +1,4 @@
-# Plumbline manual testing guide
+# SiteFolio manual testing guide
 
 Every scenario here is also automated as a click-through in Chromium: see [e2e/README.md](../e2e/README.md)
 (`cd e2e && npm test`).

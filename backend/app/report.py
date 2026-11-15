@@ -73,7 +73,7 @@ def _solana(c: dict) -> str:
     if sol.get("state") != "recorded":
         return ""
     moved = (f"Paid {money(sol['pay'])}; held {money(sol['hold'])} in a holding account that needs both the lender's and "
-             f"Plumbline's signatures." if sol.get("moves") else "No money moved; the decision is recorded.")
+             f"SiteFolio's signatures." if sol.get("moves") else "No money moved; the decision is recorded.")
     release = (f" The held amount was released later: <a href='{e(sol['release_explorer'])}'>release transaction</a>."
                if sol.get("released") else "")
     return (f"<h2>Recorded on Solana (devnet)</h2><p>{e(moved)} Signed by {e(sol.get('signer'))}. "
@@ -84,7 +84,7 @@ def _solana(c: dict) -> str:
 
 def render(c: dict, review: str | None, steps_done: int, audience: str = "full") -> str:
     o, B, p = c["outcome"], BUILDINGS[c["b"]], party(c)
-    head = f"<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>Plumbline · {e(c['id'])}</title><style>{STYLE}</style></head><body><main>"
+    head = f"<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>SiteFolio · {e(c['id'])}</title><style>{STYLE}</style></head><body><main>"
     toolbar = '<div class="toolbar"><button onclick="print()">Save as PDF</button></div>'
     data_note = ("Buildings and measurements come from CoStar, Vexcel and Matterport. Parties, bills and history in this demo are sample data."
                  if B.get("real") else "All buildings, parties and numbers in this demo are sample data.")
@@ -95,7 +95,7 @@ def render(c: dict, review: str | None, steps_done: int, audience: str = "full")
         return (head + toolbar + f"<div class=over>For tenants of {e(B['name'])} · {e(B['city'])}</div>"
                 f"<h1>Your rent increase should be {verified} a month.</h1>"
                 f"<p>Your landlord asked for <b>${r['claimed']:.2f}</b> a month per apartment for {e(c['title'].lower())}. "
-                f"Plumbline checked the building itself.</p><h2>What we found</h2><ul>{found}</ul>"
+                f"SiteFolio checked the building itself.</p><h2>What we found</h2><ul>{found}</ul>"
                 f"<div class=box><b>${(r['claimed'] - r['verified']) * r['months']:,.0f}</b> less over {r['months'] // 12} years, per apartment. "
                 f"Status: {'the reviewer has recorded a decision' if review else 'waiting for the reviewer’s final decision'}.</div>"
                 f"<h2>Proof</h2>{_aerial(B)}<p>Roof from above: {B['roof']:,} sq ft. Sources: building record (CoStar), aerial survey (Vexcel)"
@@ -122,5 +122,5 @@ def render(c: dict, review: str | None, steps_done: int, audience: str = "full")
             f"<h2>Data calls</h2>{calls}"
             f"<h2>Audit log</h2><table><tr><th>#</th><th>Who</th><th>Step</th><th>Result</th></tr>{log}"
             f"{f'<tr><td>--</td><td>Person</td><td>Decision recorded</td><td>{e(REVIEW[review])}</td></tr>' if review else ''}</table>"
-            f"<p class=note>Generated {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC by Plumbline. Money and rent math is plain code; a person approves every payment. {e(data_note)}</p>"
+            f"<p class=note>Generated {datetime.now(timezone.utc):%Y-%m-%d %H:%M} UTC by SiteFolio. Money and rent math is plain code; a person approves every payment. {e(data_note)}</p>"
             "</main></body></html>")

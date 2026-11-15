@@ -1,4 +1,4 @@
-# Plumbline architecture
+# SiteFolio architecture
 
 Read left to right: **who uses it → where it runs → the app → the deep agent → models and data → records of what
 happened**. Every external service the app talks to is in the right-hand columns.

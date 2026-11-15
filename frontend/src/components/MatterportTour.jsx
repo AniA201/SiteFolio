@@ -60,7 +60,7 @@ async function placePins(sdk, rooms) {
       room: r,
       descriptor: {
         label: `${r.label} · ${Math.round(r.sqft).toLocaleString()} sq ft`,
-        description: "Floor area measured by Matterport's Model API. This is the number Plumbline's check used.",
+        description: "Floor area measured by Matterport's Model API. This is the number SiteFolio's check used.",
         anchorPosition: { x: v.center.x, y: v.bounds.min.y + 0.05, z: v.center.z },
         stemVector: { x: 0, y: 1.1, z: 0 },
         color: AMBER,

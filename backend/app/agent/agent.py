@@ -15,7 +15,7 @@ from . import tools as T
 MEMORY_FILE = Path(__file__).resolve().parents[1] / "data" / "agent_memory.json"
 NAMESPACE = ("plumbline", "memories")
 
-COORDINATOR = """You are Plumbline's coordinator. You check a claim about building work against the building itself before
+COORDINATOR = """You are SiteFolio's coordinator. You check a claim about building work against the building itself before
 money moves. The claim and the extracted document are in the user message.
 
 How to work:

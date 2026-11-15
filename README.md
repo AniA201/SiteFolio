@@ -1,6 +1,6 @@
-# Plumbline
+# SiteFolio
 
-Check the paper against the building. Plumbline reads a bill, rent increase application or loan draw request and checks every claim against three views of the same building (CoStar record, Vexcel aerial imagery, Matterport 3D scan), plus history in Tiger Data. Plain code does the money math, and a person approves.
+Check the paper against the building. SiteFolio reads a bill, rent increase application or loan draw request and checks every claim against three views of the same building (CoStar record, Vexcel aerial imagery, Matterport 3D scan), plus history in Tiger Data. Plain code does the money math, and a person approves.
 
 ## Layout
 
@@ -109,9 +109,9 @@ With the real data built, buildings and measurements are real (CoStar kit, Vexce
 
 ## Solana: receipts and payments (devnet, free)
 Every decision a person approves in Review becomes one Solana devnet transaction that does three things at once:
-1. pays the verified amount to the contractor or builder (in "Plumbline USD", a test token we mint on devnet),
+1. pays the verified amount to the contractor or builder (in "SiteFolio USD", a test token we mint on devnet),
 2. moves the unproven amount into a holding account owned by a **2-of-2 SPL Token multisig** (the lender and
-   Plumbline's verifier), so neither can release it alone,
+   SiteFolio's verifier), so neither can release it alone,
 3. records a memo with the claim id, the decision, the amounts and a **SHA-256 fingerprint of the evidence**.
 
 The agent never holds a key. The approver signs with **Phantom** (Review → Connect Phantom); without Phantom, a demo
