@@ -39,7 +39,7 @@ export default function SolanaPanel({ c, wallet, compact = false }) {
         <div className="sol-grid">
           {sol.moves ? <>
             <div><span className="muted small">Paid to {c.persona === "lender" ? "builder" : "contractor"}</span><b className="num">{fmt(sol.pay)}</b></div>
-            <div><span className="muted small">Held (needs lender + Plumbline)</span><b className="num">{sol.released ? "Released" : fmt(sol.hold)}</b></div>
+            <div><span className="muted small">Held (needs lender + SiteFolio)</span><b className="num">{sol.released ? "Released" : fmt(sol.hold)}</b></div>
           </> : <div><span className="muted small">Decision</span><b>{sol.verdict} · no money moved</b></div>}
           <div><span className="muted small">Signed by</span><b>{sol.signer}</b></div>
           <div><span className="muted small">Evidence fingerprint</span><b className="mono" title={sol.sha256}>{short(sol.sha256)}</b></div>

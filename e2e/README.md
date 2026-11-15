@@ -1,4 +1,4 @@
-# Plumbline click-through tests (Playwright, Chromium)
+# SiteFolio click-through tests (Playwright, Chromium)
 
 Every scenario in [docs/TESTING.md](../docs/TESTING.md), clicked through in a visible Chromium window.
 

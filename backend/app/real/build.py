@@ -366,7 +366,7 @@ def stories(claims: dict, b: dict) -> dict:
     return {
         "owner": [["The roof that shrank", f"A roofer billed {n0(r['claim'])} sq ft at {b['vine']['name']}. The building record and the aerial survey both say about {n0(r['measured'])}.", "CLM-2207", "vine"],
                   [f"{ac['claim']} units billed, {ac['measured']} on the roof", f"The straight-down and angled aerial views both count about {ac['measured']} rooftop AC units. The bill says {ac['claim']}.", "CLM-2214", "vine"],
-                  ["\"We changed banks.\"", "A bill asked to pay a new account. Plumbline paid $0 and opened a review.", "CLM-2223", "vine"]],
+                  ["\"We changed banks.\"", "A bill asked to pay a new account. SiteFolio paid $0 and opened a review.", "CLM-2223", "vine"]],
         "reviewer": [["Rent up for a roof a third smaller", f"A landlord claimed {n0(rso['claim'])} sq ft of roof at {b['tamarind']['name']}. The building has {n0(rso['measured'])}. Tenants would overpay for 5 years.", "RSO-3104", "tamarind"],
                      ["The same roof, charged twice", f"Tenants at {b['westmoreland']['name']} already pay for this roof until 2029. The history check catches it.", "RSO-3104", "westmoreland"]],
         "lender": [[f"{drw['measured']} of {drw['claim']} floor plans verified", f"The builder asked for {usd(drw['amount'])} for finished interiors at {b['lenox']['name']}. The 3D scans verify {drw['measured']} of {drw['claim']} floor plans.", "DRW-0412", "lenox"],

@@ -162,7 +162,7 @@ def run_claim(claim: dict, on_step: Callable[[list], None], model=None, sub_mode
     graph = build_agent(model=model, sub_models=sub_models)
     run_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": f"{claim['id']}-{run_id[:8]}"}, "recursion_limit": 120, "run_id": run_id,
-              "run_name": f"Plumbline check {claim['id']}", "tags": ["plumbline", claim.get("persona", "")],
+              "run_name": f"SiteFolio check {claim['id']}", "tags": ["plumbline", claim.get("persona", "")],
               "metadata": {"claim_id": claim["id"], "building": claim["b"]}}
     run = Run(claim_id=claim["id"], graph=graph, config=config, run_id=run_id)
     from .tools import ACTIVE_CLAIMS
@@ -186,7 +186,7 @@ def resume(run: Run, decision: str, on_step: Callable[[list], None], note: str |
     """Continue the paused run with the person's decision (approve or reject) from Review."""
     from langgraph.types import Command
     d = {"type": "approve"} if decision in ("ok", "sent") else {"type": "reject", "message": note or "The reviewer rejected this decision."}
-    config = {**run.config, "run_id": str(uuid.uuid4()), "run_name": f"Plumbline resume {run.claim_id}"}
+    config = {**run.config, "run_id": str(uuid.uuid4()), "run_name": f"SiteFolio resume {run.claim_id}"}
     skip_repeat = lambda step: None if step[1].startswith("Propose the decision") else on_step(step)  # already shown before the pause
     _drain(run, run.graph.stream(Command(resume={"decisions": [d]}), config, stream_mode="updates", subgraphs=True), skip_repeat)
     _collect(run)

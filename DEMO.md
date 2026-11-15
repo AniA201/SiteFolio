@@ -1,4 +1,4 @@
-# Plumbline demo script
+# SiteFolio demo script
 
 ## LangChain deep agents track (60 seconds)
 
@@ -6,7 +6,7 @@
 (CLM-2207) so a finished live run with a trace link is ready, and keep a second one (CLM-2223) unrun to start live.
 
 1. **The problem (10 s).** "Property managers, rent reviewers and lenders pay for building work they never saw.
-   Plumbline's deep agent checks every claim against the building itself: CoStar records, Vexcel aerial imagery and
+   SiteFolio's deep agent checks every claim against the building itself: CoStar records, Vexcel aerial imagery and
    Matterport 3D scans."
 2. **Start a live run (15 s).** Claims → CLM-2223 → Run agent. As steps stream in, point out:
    the coordinator writes its **to-do list** (`write_todos`), sends **sub-agents** (records clerk, roof inspector,
@@ -31,7 +31,7 @@ Run DRW-0412 so it waits in Review (Lender view). Keep the Explorer tab ready.
 1. "The AI finds the evidence, but it can't move money. Only a person's signature can, and Solana proves what they
    approved." Review → Connect Phantom → Release $461,538, hold $138,462 → sign in Phantom.
 2. Open "Recorded on Solana ↗": one transaction paid the builder, moved $138,462 into a 2-of-2 holding account
-   (lender + Plumbline) and recorded the evidence fingerprint in a memo.
+   (lender + SiteFolio) and recorded the evidence fingerprint in a memo.
 3. Verify evidence → green. Edit the evidence (demo) → red: "Evidence changed after approval." Undo.
 4. "New scan verified: release $138,462" → sign again: the held money moves with both signatures and its own receipt.
 

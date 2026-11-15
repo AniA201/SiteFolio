@@ -40,7 +40,7 @@ async def lifespan(_: FastAPI):
     await engine.stop()
 
 
-app = FastAPI(title="Plumbline API", lifespan=lifespan)
+app = FastAPI(title="SiteFolio API", lifespan=lifespan)
 
 
 class RunAll(BaseModel):

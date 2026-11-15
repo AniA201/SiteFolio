@@ -18,7 +18,7 @@ export default function FoolPhone({ S, A }) {
   return (
     <div style={{ maxWidth: 460, margin: "0 auto", padding: "max(20px, env(safe-area-inset-top)) 18px 40px" }}>
       <div className="row between">
-        <span className="word" style={{ fontSize: 13, letterSpacing: ".3em" }}>PLUMBLINE</span>
+        <span className="word" style={{ fontSize: 13, letterSpacing: ".3em" }}>SITEFOLIO</span>
         <span className="mono" style={{ fontSize: 11, color: "var(--ink3)" }}>fool-it</span>
       </div>
       {!c && <>

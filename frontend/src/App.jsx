@@ -78,7 +78,7 @@ export default function App() {
     <div>
       <a className="skip-link" href="#main" onClick={event => { event.preventDefault(); document.querySelector("#main").focus(); }}>Skip to content</a>
       <div className="navwrap"><nav className="nav" aria-label="Workspace">
-        <a className="word" href="#/overview"><svg viewBox="0 0 20 23" width="18" height="21" aria-hidden="true"><path d="M10 1v10m0 0-5 5 5 6 5-6-5-5Z" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>Plumbline</a>
+        <a className="word" href="#/overview"><svg viewBox="0 0 20 23" width="18" height="21" aria-hidden="true"><path d="M10 1v10m0 0-5 5 5 6 5-6-5-5Z" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>SiteFolio</a>
         <div className="navlinks">
           {NAV.map(([k, l]) => <a key={k} href={`#/${k}`} aria-current={active === k ? "page" : undefined} className={active === k ? "on" : ""}>{l}{k === "review" && reviewCount > 0 && <span className="nav-count" aria-label={reviewCount + " pending"}>{reviewCount}</span>}</a>)}
         </div>
@@ -112,7 +112,7 @@ export default function App() {
       </nav></div>
       <main id="main" tabIndex={-1}>{state.rev >= 0 ? body : <p className="wrapx" role="status">Loading workspace…</p>}</main>
       <footer><div className="wrapx row between wrap">
-        <span className="small muted">Plumbline · Building evidence for payment review</span>
+        <span className="small muted">SiteFolio · Building evidence for payment review</span>
         <Flag t={META.data_note || "All buildings, parties and numbers are sample data"} />
       </div></footer>
     </div>
